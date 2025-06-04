@@ -1,8 +1,10 @@
+from genome import Genome
+
 innovation_numbers = []
 node_numbers = []
 
 class Node:
-    def __init__(self,idno, ntype, actfun, bias):
+    def __init__(self,idno:int, ntype: str, actfun, bias: float):
         self.id = idno
         self.type = ntype
         self.actfun =actfun
@@ -33,3 +35,10 @@ class Network:
     def __init__(self,node, connection):
         self.node = node
         self.conn = connection
+
+
+
+class Species:
+    def __init__(self,id,genomes: list[Genome]):
+        self.genomes= genomes
+        self.id = id  
