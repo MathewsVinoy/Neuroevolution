@@ -25,17 +25,6 @@ class Connection:
         self.innoNo = innovation_number 
 
 
-class Genome:
-    """
-        Genotype(Genome):
-            things the are not visible
-    """
-    def __init__(self,node:list, connection:list,fitness:float):
-        self.node = node
-        self.conn = connection
-        self.fitness = fitness
-
-
 class Network:
     """
         Network (Phenotype):

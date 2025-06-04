@@ -1,7 +1,18 @@
 import random
 from components import Node, Connection, innovation_numbers, node_numbers
 
-class Mutation:
+class Genome:
+    """
+        Genotype(Genome):
+            things the are not visible
+    """
+    def __init__(self,node:list[Node], connection:list[Connection],fitness:float):
+        self.node = node
+        self.conn = connection
+        self.fitness = fitness
+
+
+    # mutation add connection
     def addConnection(self,in_node,out_node):
         weight = random.randrange(-1,1)
         inn_no = len(innovation_numbers)
@@ -13,7 +24,8 @@ class Mutation:
             innovation_number=inn_no,
             weight=weight
         )
-       
+    
+    # mutation add Node
     def addNode(self, old_conn: Connection,type):
         old_conn.enable=False
         no = len(node_numbers)
@@ -43,4 +55,4 @@ class Mutation:
             weight=old_conn.weight,
         )
 
-   
+    
