@@ -39,6 +39,27 @@ class Network:
 
 
 class Species:
-    def __init__(self,id,genomes: list[Genome]):
+    """
+    species is represented by a random genome inside the species from the previous generation
+    """
+
+    def __init__(self,id,genomes: list[Genome],rep: Genome):
         self.genomes= genomes
-        self.id = id  
+        self.id = id
+        self.rep = rep
+
+    def compatibilityDistance(self, genome: Genome,c1=1.0, c2=1.0, c3=0.4):
+        inGenome = {conn.innoNo: conn for conn in genome.conn}
+        repGenome = {conn.innoNo: conn for conn in self.rep.conn}
+
+        innovationNo1 = set(inGenome.keys())
+        innovationNo2 = set(repGenome.keys())
+
+        match_genes =  innovationNo1 & innovationNo2
+        disjoint_genes = (innovationNo1^innovationNo2)-(innovationNo1|innovationNo2).difference(match_genes)
+
+    """
+    Todo: Compatibility Distance(cd)
+        cd = (c1*E)/N + (c2*D)/N +c3* W
+    for more details read the research paper on the top 3.3
+    """
