@@ -38,7 +38,7 @@ class Network:
 
 
 
-class Species:
+class Specie:
     """
     species is represented by a random genome inside the species from the previous generation
     """
@@ -57,9 +57,23 @@ class Species:
 
         match_genes =  innovationNo1 & innovationNo2
         disjoint_genes = (innovationNo1^innovationNo2)-(innovationNo1|innovationNo2).difference(match_genes)
+        exec_genes = {
+            inn for inn in innovationNo1 | innovationNo2 
+            if(inn> max(innovationNo1)and inn in innovationNo2)or 
+            (inn >max(innovationNo2)and inn in innovationNo1)
+        }
+        if match_genes:
+            W= sum(abs(inGenome[i].weight-repGenome[i].weight)for i in match_genes)
+        else:
+            W=0.0
 
-    """
-    Todo: Compatibility Distance(cd)
-        cd = (c1*E)/N + (c2*D)/N +c3* W
-    for more details read the research paper on the top 3.3
-    """
+        N= max(len(genome.conn),len(self.rep.conn))
+        E = len(exec_genes)
+        D = len(disjoint_genes)
+
+        delta = (c1*E)/N + (c2*D)/N +(c3* W)
+        return delta
+
+class Population:
+    def __init__(self, species: list[Specie]):
+        self.species = species
