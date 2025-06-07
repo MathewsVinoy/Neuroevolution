@@ -1,7 +1,8 @@
-from genome import Genome
+import random
 
-innovation_numbers = []
-node_numbers = []
+
+innovation_numbers=[]
+node_numbers=[]
 
 class Node:
     def __init__(self,idno:int, ntype: str, actfun, bias: float):
@@ -9,6 +10,7 @@ class Node:
         self.type = ntype
         self.actfun =actfun
         self.bias = bias
+        self.value = 0.0
 
 class Connection:
     """
@@ -26,6 +28,61 @@ class Connection:
         self.enable = enable  
         self.innoNo = innovation_number 
 
+class Genome:
+    """
+        Genotype(Genome):
+            things the are not visible
+    """
+    def __init__(self,node:list[Node], connection:list[Connection],fitness:float):
+        self.node = node
+        self.conn = connection
+        self.fitness = fitness
+
+
+    # mutation add connection
+    def addConnection(self,in_node,out_node):
+        weight = random.randrange(-1,1)
+        inn_no = len(innovation_numbers)
+        innovation_numbers.append(inn_no)
+        conn = Connection(
+            input_id=in_node,
+            out_id=out_node,
+            enable=True,
+            innovation_number=inn_no,
+            weight=weight
+        )
+    
+    # mutation add Node
+    def addNode(self, old_conn: Connection,type):
+        old_conn.enable=False
+        no = len(node_numbers)
+        node_numbers.append(no)
+        new_node = Node(
+            ntype=type,
+            actfun='',
+            bias=0,
+            idno=0,
+        )
+        inn_no = len(innovation_numbers)
+        innovation_numbers.append(inn_no)
+        conn1 = Connection(
+            input_id=old_conn.inId,
+            enable=True,
+            innovation_number=inn_no,
+            out_id= new_node.id,
+            weight=1,
+        )
+        inn_no = len(innovation_numbers)
+        innovation_numbers.append(inn_no)
+        conn2 = Connection(
+            input_id=new_node.id,
+            enable=True,
+            innovation_number=inn_no,
+            out_id= old_conn.outId,
+            weight=old_conn.weight,
+        )
+
+    
 
 class Network:
     """
@@ -77,6 +134,7 @@ class Specie:
 class Population:
     def __init__(self, species: list[Specie]):
         self.species = species
+        self.id =0
 
 """
 todo:fitness shereing with its equation
