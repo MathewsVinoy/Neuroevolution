@@ -77,3 +77,7 @@ class Specie:
 class Population:
     def __init__(self, species: list[Specie]):
         self.species = species
+
+"""
+todo:fitness shereing with its equation
+"""
