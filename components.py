@@ -3,6 +3,9 @@ import random
 
 innovation_numbers=[]
 node_numbers=[]
+innovation_no = 0
+
+node_no = 0
 
 class Node:
     def __init__(self,idno:int, ntype: str, actfun, bias: float):
@@ -10,7 +13,6 @@ class Node:
         self.type = ntype
         self.actfun =actfun
         self.bias = bias
-        self.value = 0.0
 
 class Connection:
     """
@@ -92,6 +94,7 @@ class Network:
     def __init__(self,node, connection):
         self.node = node
         self.conn = connection
+        self.values = dict((key, 0.0) for key in inputs + outputs)
 
 
 
@@ -132,9 +135,29 @@ class Specie:
         return delta
 
 class Population:
-    def __init__(self, species: list[Specie]):
+    def __init__(self, species: list[Specie]=[], genomes: list[Genome]=[]):
         self.species = species
-        self.id =0
+        self.current_generation = 0
+        self.genomes = genomes
+
+    def initialize_population(self,count:int,noInput:int,noOutput:int):
+        input_nodes=[]
+        for i in range(noInput):
+            input_nodes.append(Node(idno=node_numbers,ntype='input'))
+            node_no +=1
+        output_nodes=[]
+        for i in range(noOutput):
+            output_nodes.append(Node(idno=node_numbers,ntype='output'))
+            node_no +=1
+        
+        self.genomes=[]
+        for i in range(count):
+            conn_list =[]
+            for i in input_nodes:
+                for j in  output_nodes:
+                    conn_list.append(Connection(innovation_number=innovation_numbers,enable=True,input_id=i.id,out_id=j.id,weight=random.randrange(-1,1)))
+                    innovation_no+=1
+            self.genomes.append(Genome(node=input_nodes+output_nodes,connection=conn_list))
 
 """
 todo:fitness shereing with its equation
