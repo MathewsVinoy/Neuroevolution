@@ -88,13 +88,66 @@ class Genome:
 
 class Network:
     """
-        Network (Phenotype):
-         changes that can been seen / the changes that are visible
+    Network (Phenotype):
+    Changes that can be seen / the changes that are visible.
     """
-    def __init__(self,node, connection):
-        self.node = node
-        self.conn = connection
-        self.values = dict((key, 0.0) for key in inputs + outputs)
+    def __init__(self, genome: Genome):
+        self.node = genome.node
+        self.conn = genome.conn
+        self.node = self._topological_sort()
+    
+    
+
+    def _topological_sort(self):
+        in_degree = {node.id: 0 for node in self.node}
+        for conn in self.conn:
+            if conn.enable:
+                in_degree[conn.outId] += 1
+
+        queue = [node for node in self.node if in_degree[node.id] == 0]
+
+        topo_order = []
+
+        while queue:
+            node = queue.pop(0)
+            topo_order.append(node)
+            for conn in self.conn:
+                if conn.inId == node.id and conn.enable:
+                    in_degree[conn.outId] -= 1
+                    if in_degree[conn.outId] == 0:
+                        neighbor_node = next(n for n in self.node if n.id == conn.outId)
+                        queue.append(neighbor_node)
+
+        if len(topo_order) != len(self.node):
+            raise ValueError("The network contains a cycle and cannot be topologically sorted.")
+
+        return topo_order
+
+    def activate(self, input_vector):
+        input_nodes = [node for node in self.node if node.type == 'input']
+        output_nodes = [node for node in self.node if node.type == 'output']
+
+        if len(input_nodes) != len(input_vector):
+            raise RuntimeError("The number of inputs and input nodes does not match.")
+
+        values = {node.id: 0.0 for node in self.node}
+
+        for node, value in zip(input_nodes, input_vector):
+            values[node.id] = value
+
+        for node in self.node:
+            total = 0.0
+            for conn in self.conn:
+                if conn.outId == node.id and conn.enable:
+                    total += values[conn.inId] * conn.weight
+            if node.type != 'input':
+                values[node.id] = node.actfun(total + node.bias)
+
+        return [values[node.id] for node in output_nodes]
+
+    def _build_network_graph(self, genome:Genome):
+        pass
+            
 
 
 
@@ -140,6 +193,15 @@ class Population:
         self.current_generation = 0
         self.genomes = genomes
 
+    def evolve(self,count:int,noInput:int,noOutput:int,noGeneration):
+        self.initialize_population(count=count,noInput=noInput,noOutput=noOutput)
+
+        for i in range(noGeneration):
+            for genome in self.genomes:
+                phenotype = Network(genome=genome)
+                genome.fitness = evaluate_Fitness(phenotype)
+
+
     def initialize_population(self,count:int,noInput:int,noOutput:int):
         input_nodes=[]
         for i in range(noInput):
@@ -162,3 +224,5 @@ class Population:
 """
 todo:fitness shereing with its equation
 """
+def evaluate_Fitness():
+    pass
