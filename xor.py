@@ -12,15 +12,13 @@ innovation_numbers = 0
 node_numbers = 0
 
 #In XOR there is 2 input and 1 output
-
-#popuation. inzicalize(
 start_nodes=[]
 for n in range(2):
     start_nodes.append(Node(idno=node_numbers,ntype='input',actfun='',bias=random.random()))
     node_numbers+=1
 
 out = [Node(idno=node_numbers,ntype='output',actfun='',bias=0)]
-
+g=[]
 for i in range(COUNT):
     genes_list =[]
     conn = Connection(innovation_number=innovation_numbers,enable=True,
@@ -28,6 +26,5 @@ for i in range(COUNT):
                       weight=random.random())
     innovation_numbers+=1
     genes_list.append(conn)
-    g = Genome(connection=[genes_list],fitness=0,node=start_nodes+out)
+    g.append(Genome(connection=[genes_list],fitness=0,node=start_nodes+out))
 
-print(g.node[2].type)
