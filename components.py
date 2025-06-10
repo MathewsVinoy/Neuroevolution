@@ -156,9 +156,9 @@ class Specie:
     species is represented by a random genome inside the species from the previous generation
     """
 
-    def __init__(self,id,genomes: list[Genome],rep: Genome):
-        self.genomes= genomes
-        self.id = id
+    def __init__(self,rep: Genome):
+        self.genomes= []
+        self.id = 0
         self.rep = rep
 
     def compatibilityDistance(self, genome: Genome,c1=1.0, c2=1.0, c3=0.4):
@@ -193,14 +193,6 @@ class Population:
         self.current_generation = 0
         self.genomes = genomes
 
-    def evolve(self,count:int,noInput:int,noOutput:int,noGeneration):
-        self.initialize_population(count=count,noInput=noInput,noOutput=noOutput)
-
-        for i in range(noGeneration):
-            for genome in self.genomes:
-                phenotype = Network(genome=genome)
-                genome.fitness = evaluate_Fitness(phenotype)
-
 
     def initialize_population(self,count:int,noInput:int,noOutput:int):
         input_nodes=[]
@@ -221,8 +213,49 @@ class Population:
                     innovation_no+=1
             self.genomes.append(Genome(node=input_nodes+output_nodes,connection=conn_list))
 
+    def evolve(self,count:int,noInput:int,noOutput:int,noGeneration):
+        self.initialize_population(count=count,noInput=noInput,noOutput=noOutput)
+
+        for i in range(noGeneration):
+            for genome in self.genomes:
+                phenotype = Network(genome=genome)
+                genome.fitness = evaluate_Fitness(phenotype)
+
+            self.species.clear()
+            for genome in self.genomes:
+                found_species = False
+                for specie in self.species:
+                    pass
+                if not found_species:
+                    create_new_species()
+    
+
+def evaluate_Fitness(phrnotype: Network):
+    """
+        this only made for the XOR 
+    """
+    input_list = [[0.0,0.0],[0.0,1.0],[1.0,0.0],[1.0,1.0]]
+    output_list = [0.0,1.0,1.0,0.0]
+    total_error = 0.0
+    correct= 0
+    for i,out in zip(input_list,output_list):
+        pred = phrnotype.activate(i)
+        pred = pred[0]
+        total_error+=(out-pred)**2
+        if round(pred)==out:
+            correct+=1
+    return correct ** 2
+
+
+def create_new_species(genomes: list[Genome]):
+    specie_list = []
+    for genome in genomes:
+        if len(specie_list) == 0:
+            specie_list.append(Specie(rep=genome))
+        
+        for s in specie_list:
+            s.compatibilityDistance(genome)
+
 """
 todo:fitness shereing with its equation
 """
-def evaluate_Fitness():
-    pass
