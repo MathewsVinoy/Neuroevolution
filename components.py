@@ -7,6 +7,8 @@ innovation_no = 0
 
 node_no = 0
 
+compatibility_threshold = 3.0
+
 class Node:
     def __init__(self,idno:int, ntype: str, actfun, bias: float):
         self.id = idno
@@ -160,6 +162,7 @@ class Specie:
         self.genomes= []
         self.id = 0
         self.rep = rep
+        self.delta = 0.0
 
     def compatibilityDistance(self, genome: Genome,c1=1.0, c2=1.0, c3=0.4):
         inGenome = {conn.innoNo: conn for conn in genome.conn}
@@ -225,9 +228,14 @@ class Population:
             for genome in self.genomes:
                 found_species = False
                 for specie in self.species:
-                    pass
+                    delta = specie.compatibilityDistance(genome)
+                    if delta < compatibility_threshold:
+                        specie.genomes.append(genome)
+                        found_species =True
+                        break
                 if not found_species:
-                    create_new_species()
+                    new_species = Specie(genome)
+                    new_species.genomes.append(genome)
     
 
 def evaluate_Fitness(phrnotype: Network):
@@ -246,16 +254,8 @@ def evaluate_Fitness(phrnotype: Network):
             correct+=1
     return correct ** 2
 
+            
 
-def create_new_species(genomes: list[Genome]):
-    specie_list = []
-    for genome in genomes:
-        if len(specie_list) == 0:
-            specie_list.append(Specie(rep=genome))
-        
-        for s in specie_list:
-            s.compatibilityDistance(genome)
-
-"""
-todo:fitness shereing with its equation
-"""
+    """
+    todo: compleate this above create_new_species()
+    """
