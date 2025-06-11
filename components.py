@@ -1,4 +1,5 @@
 import random
+from cross_over import Crossover
 
 
 innovation_numbers=[]
@@ -8,6 +9,7 @@ innovation_no = 0
 node_no = 0
 
 compatibility_threshold = 3.0
+POPULATIONA_SIZE =1
 
 class Node:
     def __init__(self,idno:int, ntype: str, actfun, bias: float):
@@ -44,20 +46,30 @@ class Genome:
 
 
     # mutation add connection
-    def addConnection(self,in_node,out_node):
+    def addConnection(self):
+        if len(self.node)<2:
+            raise RuntimeError("need 2 or more than 2 nodes")
+        
+        graph={}
+        for c in self.conn:
+            if c.enable == True:
+                if c.inId not in graph:
+                    graph[c.inId]=[]
+                graph[c.inId].append(c.outId)
+                
         weight = random.randrange(-1,1)
         inn_no = len(innovation_numbers)
         innovation_numbers.append(inn_no)
-        conn = Connection(
-            input_id=in_node,
-            out_id=out_node,
+        self.node.append(Connection(
+            input_id=n1,
+            out_id=n2,
             enable=True,
             innovation_number=inn_no,
             weight=weight
-        )
+        ))
     
     # mutation add Node
-    def addNode(self, old_conn: Connection,type):
+    def addNode(self):
         old_conn.enable=False
         no = len(node_numbers)
         node_numbers.append(no)
@@ -162,7 +174,8 @@ class Specie:
         self.genomes= []
         self.id = 0
         self.rep = rep
-        self.delta = 0.0
+        self.staleness = 0.0
+        self.fitness =0.0
 
     def compatibilityDistance(self, genome: Genome,c1=1.0, c2=1.0, c3=0.4):
         inGenome = {conn.innoNo: conn for conn in genome.conn}
@@ -195,6 +208,14 @@ class Population:
         self.species = species
         self.current_generation = 0
         self.genomes = genomes
+    
+    def remove_members(self, species: Specie, percentage: float = 0.5):
+        species.genomes.sort(key=lambda genome: genome.fitness)
+        half= int(len(species.genomes)*percentage)
+        species.genomes = species.genomes[half:]
+
+    def remove_stale_species(self, max_staleness: int = 20):
+        self.species = [species for species in self.species if species.staleness < max_staleness]
 
 
     def initialize_population(self,count:int,noInput:int,noOutput:int):
@@ -217,6 +238,7 @@ class Population:
             self.genomes.append(Genome(node=input_nodes+output_nodes,connection=conn_list))
 
     def evolve(self,count:int,noInput:int,noOutput:int,noGeneration):
+
         self.initialize_population(count=count,noInput=noInput,noOutput=noOutput)
 
         for i in range(noGeneration):
@@ -236,6 +258,38 @@ class Population:
                 if not found_species:
                     new_species = Specie(genome)
                     new_species.genomes.append(genome)
+            
+            self.remove_stale_species()
+            for s in self.species:
+                self.remove_members(s)
+            
+            for s in self.species:
+                for g in s.genomes:
+                    g.fitness = g.fitness/len(s.genomes)
+            
+            new_generation_genomes = []
+            total_adjacent_fitness = sum(g.fitness for s in self.species for g in s.genomes)
+
+            for s in self.species:
+                #  num_offspring_for_species = round(species.total_adjusted_fitness / total_adjusted_fitness * population_size)
+                species_adj_fitness = sum(g.fitness for g in s.genomes)
+                num_offsprings = round(species_adj_fitness/total_adjacent_fitness * count)
+                for i in range(num_offsprings):
+                    parent1 = genome
+                    parent2 = genome
+                    if random.randrange(-1,1) > 0.5:
+                        child_node = Crossover(parent1=parent1,parent2=parent2)
+                    else:
+                        child_node = parent1
+                    
+                    if random.randrange(-1,1)> 0.5:
+                        child_node.addNode()
+                    if random.randrange(-1,1)> 0.5:
+                        child_node.addConnection()
+                    new_generation_genomes.append(child_node)
+            self.genomes= new_generation_genomes
+            self.current_generation = i+1
+            
     
 
 def evaluate_Fitness(phrnotype: Network):
