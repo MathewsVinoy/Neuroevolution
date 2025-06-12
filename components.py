@@ -1,5 +1,6 @@
 import random
 from cross_over import Crossover
+from activation import sigmoid_activation
 
 
 innovation_numbers=[]
@@ -56,20 +57,39 @@ class Genome:
                 if c.inId not in graph:
                     graph[c.inId]=[]
                 graph[c.inId].append(c.outId)
-                
-        weight = random.randrange(-1,1)
-        inn_no = len(innovation_numbers)
-        innovation_numbers.append(inn_no)
-        self.node.append(Connection(
-            input_id=n1,
-            out_id=n2,
-            enable=True,
-            innovation_number=inn_no,
-            weight=weight
-        ))
+        for _ in range(len(self.nodes) * (len(self.nodes) - 1)):
+            n1, n2 = random.sample(self.nodes, 2)
+            if not self._creates_cycle(graph, n1.id, n2.id):    
+                weight = random.randrange(-1,1)
+                inn_no = len(innovation_numbers)
+                innovation_numbers.append(inn_no)
+                self.node.append(Connection(
+                    input_id=n1,
+                    out_id=n2,
+                    enable=True,
+                    innovation_number=inn_no,
+                    weight=weight
+                ))
+
+    def _creates_cycle(self, graph, start, end):
+        visited = set()
+        stack = [start]
+
+        while stack:
+            node = stack.pop()
+            if node == end:
+                return True
+            if node not in visited:
+                visited.add(node)
+                if node in graph:
+                    for neighbor in graph[node]:
+                        if neighbor not in visited:
+                            stack.append(neighbor)
+        return False
     
     # mutation add Node
     def addNode(self):
+        old_conn = random.choice(self.conn)
         old_conn.enable=False
         no = len(node_numbers)
         node_numbers.append(no)
@@ -221,7 +241,7 @@ class Population:
     def initialize_population(self,count:int,noInput:int,noOutput:int):
         input_nodes=[]
         for i in range(noInput):
-            input_nodes.append(Node(idno=node_numbers,ntype='input'))
+            input_nodes.append(Node(idno=node_numbers,ntype='input',actfun=sigmoid_activation))
             node_no +=1
         output_nodes=[]
         for i in range(noOutput):
@@ -275,8 +295,7 @@ class Population:
                 species_adj_fitness = sum(g.fitness for g in s.genomes)
                 num_offsprings = round(species_adj_fitness/total_adjacent_fitness * count)
                 for i in range(num_offsprings):
-                    parent1 = genome
-                    parent2 = genome
+                    parent1, parent2 = random.sample(s.genomes, 2)
                     if random.randrange(-1,1) > 0.5:
                         child_node = Crossover(parent1=parent1,parent2=parent2)
                     else:
