@@ -1,5 +1,4 @@
 import random
-from cross_over import Crossover
 from activation import sigmoid_activation
 
 
@@ -117,6 +116,56 @@ class Genome:
             out_id= old_conn.outId,
             weight=old_conn.weight,
         )
+    
+    def node_crossover(self, parent1:Node,parent2:Node)->Node:
+        assert parent1.id==parent2.id
+        bias = random.choice([parent1.bias,parent2.bias])
+        act_fun = random.choice([parent1.actfun,parent2.actfun])
+        return Node(idno=parent1.id,ntype=parent1.type,actfun=act_fun,bias=bias)
+            
+
+    def connection_crossover(self,parent1: Connection,parent2:Connection)->Connection:
+        assert parent1.innoNo == parent2.innoNo
+        weight = random.choice([parent1.weight,parent2.weight])
+        enable = random.choice([parent1.enable,parent2.enable])
+        return Connection(innovation_number=parent1.innoNo,input_id=parent1.inId,out_id=parent1.outId,weight=weight,enable=enable)
+
+
+
+    def Crossover(self,parent2):
+        conn_dict1 = {conn.innoNo: conn for conn in self.conn}
+        conn_dict2 = {conn.innoNo: conn for conn in parent2.conn}
+
+        all_conn = sorted(set(conn_dict1.keys()) | set(conn_dict2.keys()))
+
+
+        if self.fitness > parent2.fitness:
+            fitness = self.fitness
+        else:
+            fitness = parent2.fitness
+
+
+        new_conn = []
+        for i in all_conn:
+            conn1 = conn_dict1.get(i)
+            conn2 = conn_dict2.get(i)
+            print(conn1)
+
+            if conn1 and conn2:
+                new_conn.append(self.connection_crossover(conn1, conn2))
+            elif conn1:
+                new_conn.append(conn1)
+            elif conn2:
+                new_conn.append(conn2)
+
+        self.conn = new_conn
+        new_nodes =[]
+        for n1 in self.node:
+            for n2 in parent2.node:
+                if n1.id == n2.id:
+                    new_nodes.append(self.node_crossover(n1,n2))
+        
+        self.node = new_nodes
 
     
 
@@ -297,7 +346,7 @@ class Population:
                 for i in range(num_offsprings):
                     parent1, parent2 = random.sample(s.genomes, 2)
                     if random.randrange(-1,1) > 0.5:
-                        child_node = Crossover(parent1=parent1,parent2=parent2)
+                        child_node = parent1.Crossover(parent2)
                     else:
                         child_node = parent1
                     
