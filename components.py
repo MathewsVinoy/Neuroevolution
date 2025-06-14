@@ -382,3 +382,6 @@ def evaluate_Fitness(phrnotype: Network):
     todo: compleate this above create_new_species()
     """
 
+if __name__ == "__main__":
+    p = Population()
+    p.evolve(count=20,noGeneration=50,noInput=2,noOutput=1)
