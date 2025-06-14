@@ -273,10 +273,10 @@ class Specie:
         return delta
 
 class Population:
-    def __init__(self, species: list[Specie]=[], genomes: list[Genome]=[]):
-        self.species = species
+    def __init__(self):
+        self.species = []
         self.current_generation = 0
-        self.genomes = genomes
+        self.genomes = []
     
     def remove_members(self, species: Specie, percentage: float = 0.5):
         species.genomes.sort(key=lambda genome: genome.fitness)
@@ -381,3 +381,4 @@ def evaluate_Fitness(phrnotype: Network):
     """
     todo: compleate this above create_new_species()
     """
+
