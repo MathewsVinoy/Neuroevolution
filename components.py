@@ -6,7 +6,7 @@ innovation_numbers=[]
 node_numbers=[]
 innovation_no = 0
 
-node_no = 0
+node_no =0
 
 compatibility_threshold = 3.0
 POPULATIONA_SIZE =1
@@ -277,6 +277,8 @@ class Population:
         self.species = []
         self.current_generation = 0
         self.genomes = []
+        self.node_no =0
+        self.innovation_no = 0
     
     def remove_members(self, species: Specie, percentage: float = 0.5):
         species.genomes.sort(key=lambda genome: genome.fitness)
@@ -290,20 +292,20 @@ class Population:
     def initialize_population(self,count:int,noInput:int,noOutput:int):
         input_nodes=[]
         for i in range(noInput):
-            input_nodes.append(Node(idno=node_numbers,ntype='input',actfun=sigmoid_activation))
-            node_no +=1
+            input_nodes.append(Node(idno=self.node_no,ntype='input',actfun=sigmoid_activation,bias=random.randrange(-1,1)))
+            self.node_no +=1
         output_nodes=[]
         for i in range(noOutput):
-            output_nodes.append(Node(idno=node_numbers,ntype='output'))
-            node_no +=1
+            output_nodes.append(Node(idno=self.node_no,ntype='output'))
+            self.node_no +=1
         
         self.genomes=[]
         for i in range(count):
             conn_list =[]
             for i in input_nodes:
                 for j in  output_nodes:
-                    conn_list.append(Connection(innovation_number=innovation_numbers,enable=True,input_id=i.id,out_id=j.id,weight=random.randrange(-1,1)))
-                    innovation_no+=1
+                    conn_list.append(Connection(innovation_number=self.innovation_numbers,enable=True,input_id=i.id,out_id=j.id,weight=random.randrange(-1,1)))
+                    self.innovation_no+=1
             self.genomes.append(Genome(node=input_nodes+output_nodes,connection=conn_list))
 
     def evolve(self,count:int,noInput:int,noOutput:int,noGeneration):
@@ -327,6 +329,7 @@ class Population:
                 if not found_species:
                     new_species = Specie(genome)
                     new_species.genomes.append(genome)
+                    self.species.append(new_species)
             
             self.remove_stale_species()
             for s in self.species:
