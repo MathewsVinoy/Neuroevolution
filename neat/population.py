@@ -27,24 +27,23 @@ class Population:
         
         input_nodes=[]
         for i in range(noInput):
-            n=Node(idno=Config.node_no,ntype='input')
+            n=Node(idno=Config.node_no,ntype='i')
             n.actfun= sigmoid_activation
             n.bias=random.randrange(-1,1)
             input_nodes.append(n)
             Config.node_no +=1
         output_nodes=[]
         for i in range(noOutput):
-            output_nodes.append(Node(idno=Config.node_no,ntype='output'))
+            output_nodes.append(Node(idno=Config.node_no,ntype='o'))
             Config.node_no +=1
         
         self.genomes=[]
-        for i in range(count):
-            Config.innovation_no = 0
+        for _ in range(count):
             conn_list =[]
             for i in output_nodes:
                 for j in  input_nodes:
-                    conn_list.append(Connection(innovation_number=Config.innovation_no,enable=True,input_id=j.id,out_id=i.id,weight=random.randrange(-1,1)))
-                    Config.innovation_no+=1
+                    inno=Config.innnovationTracker(j.id,i.id)
+                    conn_list.append(Connection(innovation_number=inno,enable=True,input_id=j.id,out_id=i.id,weight=random.randrange(-1,1)))
             self.genomes.append(Genome(node=input_nodes+output_nodes,connection=conn_list))
             
 
@@ -94,22 +93,29 @@ class Population:
                     if len(s.genomes) >= 2:
                         parent1, parent2 = random.sample(s.genomes, 2)
                         if random.random() > 0.5:
-                            child_node = parent1.Crossover(parent2)
+                            parent1.Crossover(parent2)
+                            child_node = parent1
                         else:
                             child_node = random.choice([parent1, parent2])
                     else:
                         child_node = random.choice(s.genomes)
 
                     if child_node is not None:
+                        print("(")
                         if random.random() < 0.5:
+                            print("1", end=" ")
                             child_node.removeConnection()
                         if random.random() < 0.5:
+                            print("2", end=" ")
                             child_node.addConnection()
                         if random.random() <0.2:
+                            print("3", end=" ")
                             child_node.removeNode()
                         if random.random() < 0.2:
+                            print("4", end=" ")
                             child_node.addNode()
                         new_generation_genomes.append(child_node)
+                        print(")")
 
 
             self.genomes = new_generation_genomes
