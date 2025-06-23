@@ -49,37 +49,20 @@ class Genome:
         """
         Performs crossover between two genomes to produce a new genome.
         """
-        new_nodes = []
-        temp= list(self.nodes + parent2.nodes)
-        for n1 in self.nodes:
-            for n2 in parent2.nodes:
-                if n1.id == n2.id:
-                    temp.remove(n1)
-                    new_nodes.append(self.node_crossover(n1, n2))
-        for n in temp:
-            if n.id not in [node.id for node in new_nodes]:
-                new_nodes.append(n)
-        conn_dict1 = {conn.innoNo: conn for conn in self.conn}
-        conn_dict2 = {conn.innoNo: conn for conn in parent2.conn}
+        conn1 = {conn.innoNo: conn for conn in self.conn}
+        conn2 = {conn.innoNo: conn for conn in parent2.conn}
+        if self.fitness < parent2.fitness:
+            p1, p2 = conn2, conn1
+        else:
+            p1, p2 = conn1, conn2
+        new_conn =[]
+        for key , v in p1.items():
+            conn = p2.get(key)
+            if conn is None:
 
-        all_conn = sorted(conn_dict1.keys() | conn_dict2.keys())
-
-        new_conn = []
-        for i in all_conn:
-            conn1 = conn_dict1.get(i)
-            conn2 = conn_dict2.get(i)
-            if conn1 and conn2:
-                new_conn.append(self.connection_crossover(conn1, conn2))
-            elif conn1:
-                new_conn.append(conn1)
-            elif conn2:
-                new_conn.append(conn2)
-
+            
         
         
-        self.next_node_id = max(self.next_node_id,parent2.next_node_id)
-        self.nodes=new_nodes
-        self.conn=new_conn
     
 
     
