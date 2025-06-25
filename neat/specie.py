@@ -10,7 +10,7 @@ class Specie:
         self.id = 0
         self.rep = rep
         self.staleness = 0.0
-        self.fitness =0.0
+        self.compatibility_threshold = 3.0
 
     def compatibilityDistance(self, genome: Genome, c1=1.0, c2=1.0, c3=0.4):
         inGenome = {conn.innoNo: conn for conn in genome.conn}
@@ -43,10 +43,12 @@ class Specie:
 
         # Normalization factor
         N = max(len(genome.conn), len(self.rep.conn))
+        
 
         # Ensure N is not zero to avoid division by zero
         if N == 0:
             print(genome.conn,self.rep.conn)
+            print(N)
             raise ValueError("Cannot calculate compatibility distance: both genomes have zero connections.")
 
         # Number of excess and disjoint genes
