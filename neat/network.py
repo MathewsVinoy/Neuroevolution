@@ -54,7 +54,8 @@ class Network:
         values = {node.id: 0.0 for node in self.node}
 
         for node, value in zip(input_nodes, input_vector):
-            values[node.id] = value
+            if node.type == 'i':
+                values[node.id] = value
 
         for node in self.node:
             total = 0.0
