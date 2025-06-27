@@ -13,3 +13,11 @@ class Connection:
         self.weight = weight
         self.enable = enable  
         self.innoNo = innovation_number 
+
+    @staticmethod
+    def innnovationTracker(innId, OutId):
+        key = (innId, OutId)
+        if key not in Config.innovation_tracker:
+            Config.innovation_tracker[key] = Config.innovation_no
+            Config.innovation_no += 1
+        return Config.innovation_tracker[key]
