@@ -51,14 +51,27 @@ class Genome:
         """
         conn1 = {conn.innoNo: conn for conn in self.conn}
         conn2 = {conn.innoNo: conn for conn in parent2.conn}
-        if self.fitness < parent2.fitness:
-            p1, p2 = conn2, conn1
-        else:
-            p1, p2 = conn1, conn2
         new_conn =[]
-        for key , v in p1.items():
-            conn = p2.get(key)
+        for key , v in conn1.items():
+            conn = conn2.get(key)
             if conn is None:
+                new_conn.append(v)
+            else:
+                new_conn.append(self.connection_crossover(v,conn))
+        
+        node1 = {node.id: node for node in self.nodes}
+        node2 = {node.id: node for node in parent2.nodes}
+        new_nodes = []
+        for key, v in node1.items():
+            node  = node2.get(key)
+            if node is None:
+                new_nodes.append(v)
+            else:
+                new_nodes.append(self.node_crossover(v, node))
+
+        self.next_node_id = max(self.next_node_id,parent2.next_node_id)
+        self.nodes=new_nodes
+        self.conn=new_conn
 
             
         
@@ -104,7 +117,6 @@ class Genome:
             return
         conn_to_remove = choice(self.conn)
         conn_to_remove.enable = False
-        print("connection dele")
         self.conn.remove(conn_to_remove)
         del conn_to_remove
 
@@ -134,23 +146,21 @@ class Genome:
         self.conn.append(new_conn2)
         self.conn.remove(old_conn)
         del old_conn
-        print("node is adding: ", new_node.id)
-        print("new node id: ", new_node.id)
-        print("new connection: ", new_conn1.inId, new_conn1.outId, new_conn2.inId, new_conn2.outId)
 
     def removeNode(self):
         if not self.nodes:
             return
         node_to_remove = choice(self.nodes)
-        if node_to_remove.type in ['o','i']:
+        if node_to_remove.type == 'o' or node_to_remove.type == 'i':
             return
         conn = [ c for c in self.conn if c.inId == node_to_remove.id or c.outId == node_to_remove.id]
+        if len(conn) >= len(self.conn):
+            return
         for c in conn:
             c.enable = False
             self.conn.remove(c)
             del c
         self.nodes.remove(node_to_remove)
-        print("node deleted", node_to_remove.id, node_to_remove.type)
         del node_to_remove
         
 
