@@ -18,55 +18,24 @@ class Population(object):
         self.genomes = []
         self.best_fitness = []
         self.avg_fitness =[]
+        self.species_log = []
         self.create_population()
         
     
     def create_population(self):
-        self.genome =[]
+        self.genomes =[]
         for i in range(Config.pop_size):
             g = Genome.create_minimally_connected()
-            self.genome.append(g)
+            gene =Genome(node=g['node'],connection=g['conn'])
+            self.genomes.append(gene)
 
-            
-    def remove_members(self, species: Specie, percentage: float = 0.5):
-        species.genomes.sort(key=lambda genome: genome.fitness)
-        half= int(len(species.genomes)*percentage)
-        species.genomes = species.genomes[half:]
-
-    def remove_stale_species(self, max_staleness: int = 20):
-        self.species = [species for species in self.species if species.staleness < max_staleness]
-
-
-    def initialize_population(self,count:int,noInput:int,noOutput:int):
-        
-        input_nodes=[]
-        for i in range(noInput):
-           
-            input_nodes.append(Node(idno=Config.node_no,ntype='i'))
-            Config.node_no +=1
-        output_nodes=[]
-        for i in range(noOutput):
-            n=Node(idno=Config.node_no,ntype='o')
-            n.bias = random.random()
-            output_nodes.append(n)
-
-            Config.node_no +=1
-        
-        self.genomes=[]
-        for _ in range(count):
-            conn_list =[]
-            for i in output_nodes:
-                for j in  input_nodes:
-                    inno=Config.innnovationTracker(j.id,i.id)
-                    conn_list.append(Connection(innovation_number=inno,enable=True,input_id=j.id,out_id=i.id,weight=random.random()))
-            self.genomes.append(Genome(node=input_nodes+output_nodes,connection=conn_list))
-
+   
     def speciate(self):
         for genome in self.genomes:
             found = False
             for s in self.species:
                 if genome.distance(s.rep) < Config.compatibility_threshold:
-                    s.add(genome)
+                    s.genomes.append(genome)
                     found = True
             if not found:
                 self.species.append(Specie(rep=genome))
@@ -76,15 +45,15 @@ class Population(object):
     def set_compatibility_threshlod(self):
         if len(self.species) > Config.species_size:
             Config.compatibility_threshold += Config.compatibility_change
-        elif len(self.__species) < Config.species_size:
+        elif len(self.species) < Config.species_size:
             if Config.compatibility_threshold > Config.compatibility_change:
                 Config.compatibility_threshold -= Config.compatibility_change
     def avg_fitness_fn(self):
         sum = 0.0
-        for g in self.genome:
+        for g in self.genomes:
             sum += g.fitness
         
-        return sum/len(self.genome)
+        return sum/len(self.genomes)
     
     def compute_spawn_levels(self):
         species_stats =[]
@@ -103,19 +72,31 @@ class Population(object):
             s.spawn_amount = int(round((species_stats[i]*Config.pop_size/total_average)))
         
     def log_species(self):
-        pass
+        higher = max([s.id for s in self.species])
+        temp=[]
+        for i in range(higher):
+            found_species = False
+            for s in self.species:
+                if i == s.id:
+                    temp.append(len(s))     
+                    found_species = True
+                    break
+            if not found_species:
+                temp.append(0)
+        self.species_log.append(temp) 
+
 
     def evolve(self, no):
         for _ in range(no):
             self.current_generation +=1
             self.evaluate_Fitness()
             self.speciate()
-            self.best_fitness.append(max(self.genomes))
+            self.best_fitness.append(max(self.genomes, key=lambda g: g.fitness))
             self.avg_fitness.append(self.avg_fitness_fn())
             best = self.best_fitness[-1]
             for s in self.species:
                 s.hasBest = False
-                if best.id in s.genomes:
+                if best in s.genomes:
                     s.hasBest = True
             
             save_model(best)
@@ -130,7 +111,7 @@ class Population(object):
                                 self.remove(g)
             
             for s in self.species:
-                if s.no_inmprovement_age > 2 *Config.max_stagnation:
+                if s.no_improvement_age > 2 *Config.max_stagnation:
                     self.species.remove(s)
 
                     for g in self.genomes:
@@ -145,3 +126,27 @@ class Population(object):
                             self.genomes.remove(s)
 
             self.log_species()
+            new_population = []
+            for s in self.species:
+                new_population.extend(s.reproduce())
+
+            fill = Config.pop_size - len(new_population)
+            if fill < 0:
+                new_population = new_population[:fill]
+            if fill > 0:
+                while fill > 0:
+                    parent1 = random.choice(self.genome)
+                    found = False
+                    for c in self.genome:
+                        for s in self.species:
+                            if c in s.genomes and parent1 in s.genomes:
+                                child = parent1.crossover(c)
+                                new_population.append(child.mutate())
+                                found = True
+                                break
+                    if not found:
+                        new_population.append(parent1.mutate())
+
+            assert Config.pop_size== len(new_population), 'Different population sizes!'
+            self.genome = new_population
+
