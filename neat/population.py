@@ -34,7 +34,9 @@ class Population(object):
         for genome in self.genomes:
             found = False
             for s in self.species:
-                if genome.distance(s.rep) < Config.compatibility_threshold:
+                if s.rep is None:
+                    s.rep = genome
+                if genome.distance(s.rep.conn) < Config.compatibility_threshold:
                     s.genomes.append(genome)
                     found = True
             if not found:
@@ -52,6 +54,7 @@ class Population(object):
         sum = 0.0
         for g in self.genomes:
             sum += g.fitness
+        
         
         return sum/len(self.genomes)
     
@@ -78,7 +81,7 @@ class Population(object):
             found_species = False
             for s in self.species:
                 if i == s.id:
-                    temp.append(len(s))     
+                    temp.append(len(s.genomes))     
                     found_species = True
                     break
             if not found_species:
@@ -88,7 +91,9 @@ class Population(object):
 
     def evolve(self, no):
         for _ in range(no):
+
             self.current_generation +=1
+            print('\n ****** Running generation ',self.current_generation,' ****** \n')
             self.evaluate_Fitness()
             self.speciate()
             self.best_fitness.append(max(self.genomes, key=lambda g: g.fitness))
@@ -123,30 +128,33 @@ class Population(object):
                 if s.spawn_amount == 0:
                     for g in self.genomes:
                         if g in s.genomes:
-                            self.genomes.remove(s)
+                            self.genomes.remove(g)
 
             self.log_species()
             new_population = []
             for s in self.species:
-                new_population.extend(s.reproduce())
+                if s.spawn_amount > 0:
+                    new_population.extend(s.reproduce())
+
 
             fill = Config.pop_size - len(new_population)
             if fill < 0:
                 new_population = new_population[:fill]
             if fill > 0:
                 while fill > 0:
-                    parent1 = random.choice(self.genome)
+                    parent1 = random.choice(self.genomes)
                     found = False
-                    for c in self.genome:
+                    for c in self.genomes:
                         for s in self.species:
                             if c in s.genomes and parent1 in s.genomes:
-                                child = parent1.crossover(c)
-                                new_population.append(child.mutate())
+                                parent1.crossover(c)
+                                new_population.append(parent1.mutate())
                                 found = True
                                 break
                     if not found:
                         new_population.append(parent1.mutate())
-
+                    fill -= 1                     
+            print('Species:', len(self.species), 'Population:', len(new_population))
             assert Config.pop_size== len(new_population), 'Different population sizes!'
             self.genome = new_population
 
