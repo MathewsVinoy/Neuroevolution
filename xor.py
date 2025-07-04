@@ -1,20 +1,26 @@
+from neat import config
 from neat.population import Population
 from neat.network import Network
-import pickle
+import math
 
-def train():
-    p = Population()
-    p.evolve(count=10, noGeneration=80, noInput=2, noOutput=1)  
+config.load('xor2_config')
 
+INPUTS = [[0, 0], [0, 1], [1, 0], [1, 1]]
+OUTPUTS = [0, 1, 1, 0]
 
-def load_model():
-    with open('models/model.pkl', 'rb') as f:
-        genome = pickle.load(f)
+def eval_function(pop: Population):
+    for g in pop.genomes:
+        if g == None:
+            continue
+        error = 0.0
+        nn = Network(g)
+        for i, inputs in enumerate(INPUTS):
+            nn.reset()
+            output = nn.activate(inputs)
+            error += (output[0]-OUTPUTS[i])**2
 
-    network = Network(genome=genome)
-    output = network.activate([1,0])
-    print(output)
+        g.fitness = 1-math.sqrt(error/len(OUTPUTS))
 
-if __name__ == "__main__":
-    train()
-    load_model()
+Population.evaluate_Fitness = eval_function
+
+Population().evolve(no=300)
