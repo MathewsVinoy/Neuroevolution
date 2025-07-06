@@ -87,7 +87,7 @@ class Genome(object):
             wight = gauss(0,0.9)
             conn.append(Connection(input_id=input_node.id,out_id=node.id,weight=wight,enable=True))
         
-        return {"conn":conn,"node":nodes}
+        return Genome(node=nodes, connection=conn)
 
 
     def node_crossover(self, parent1: Node, parent2: Node) -> Node:
