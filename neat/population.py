@@ -26,13 +26,13 @@ class Population(object):
         self.genomes =[]
         for i in range(Config.pop_size):
             g = Genome.create_minimally_connected()
-            gene =Genome(node=g['node'],connection=g['conn'])
-            self.genomes.append(gene)
+            self.genomes.append(g)
 
-   
+
     def speciate(self):
         for genome in self.genomes:
             found = False
+            
             for s in self.species:
                 if s.rep is None:
                     s.rep = genome
@@ -91,55 +91,54 @@ class Population(object):
 
     def evolve(self, no):
         for _ in range(no):
-
-            self.current_generation +=1
-            print('\n ****** Running generation ',self.current_generation,' ****** \n')
+            self.current_generation += 1
+            print('\n ****** Running generation ', self.current_generation, ' ****** \n')
             self.evaluate_Fitness()
             self.speciate()
             self.best_fitness.append(max(self.genomes, key=lambda g: g.fitness))
             self.avg_fitness.append(self.avg_fitness_fn())
             best = self.best_fitness[-1]
+
             for s in self.species:
                 s.hasBest = False
                 if best in s.genomes:
                     s.hasBest = True
-            
             save_model(best)
 
-            # remove the based performing genomes
+            # Remove the worst performing genomes
             for s in self.species[:]:
                 if s.no_improvement_age > Config.max_stagnation:
                     if not s.hasBest:
                         self.species.remove(s)
-                        for g in self.genome[:]:
+                        for g in self.genomes[:]:
                             if g in s.genomes:
-                                self.remove(g)
-            
-            for s in self.species:
-                if s.no_improvement_age > 2 *Config.max_stagnation:
+                                self.genomes.remove(g)
+                if s.no_improvement_age > 2 * Config.max_stagnation:
                     self.species.remove(s)
-
-                    for g in self.genomes:
+                    for g in self.genomes[:]:
                         if g in s.genomes:
                             self.genomes.remove(g)
 
             self.compute_spawn_levels()
             for s in self.species:
                 if s.spawn_amount == 0:
-                    for g in self.genomes:
+                    for g in self.genomes[:]:
                         if g in s.genomes:
                             self.genomes.remove(g)
+            
 
             self.log_species()
             new_population = []
             for s in self.species:
                 if s.spawn_amount > 0:
                     new_population.extend(s.reproduce())
-
+            
 
             fill = Config.pop_size - len(new_population)
+            print(f"Population fill required: {fill}")  # Debugging statement
+
             if fill < 0:
-                new_population = new_population[:fill]
+                new_population = new_population[:Config.pop_size]
             if fill > 0:
                 while fill > 0:
                     parent1 = random.choice(self.genomes)
@@ -151,10 +150,14 @@ class Population(object):
                                 new_population.append(parent1.mutate())
                                 found = True
                                 break
+                        if found:
+                            break
                     if not found:
                         new_population.append(parent1.mutate())
-                    fill -= 1                     
-            print('Species:', len(self.species), 'Population:', len(new_population))
-            assert Config.pop_size== len(new_population), 'Different population sizes!'
-            self.genome = new_population
+                    fill -= 1
 
+            print(f"Species: {len(self.species)}, Population: {len(new_population)}")  # Debugging statement
+            assert Config.pop_size == len(new_population), 'Different population sizes!'
+            self.genomes = new_population
+
+        
