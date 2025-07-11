@@ -1,60 +1,88 @@
 from neat.genome import Genome
+from neat.config import Config
+from random import choice
 
 class Specie:
     """
     species is represented by a random genome inside the species from the previous generation
     """
+    id = 0
 
     def __init__(self,rep: Genome):
         self.genomes= []
-        self.id = 0
+        self.id = self.get_new_id()
+        self.age = 0
         self.rep = rep
         self.staleness = 0.0
+        self.hasBest = False
+        self.no_improvement_age = 0
         self.compatibility_threshold = 3.0
+        self.last_avg_fitness = 0
+        self.spawn_amount = 0
 
-    def compatibilityDistance(self, genome: Genome, c1=1.0, c2=1.0, c3=0.4):
-        inGenome = {conn.innoNo: conn for conn in genome.conn}
-        repGenome = {conn.innoNo: conn for conn in self.rep.conn}
-
-        innovationNo1 = set(inGenome.keys())
-        innovationNo2 = set(repGenome.keys())
-
-        # Matching genes
-        match_genes = innovationNo1 & innovationNo2
-
-        # Disjoint genes
-        disjoint_genes = (innovationNo1 - match_genes) | (innovationNo2 - match_genes)
-
-        # Excess genes
-        max_innovation1 = max(innovationNo1) if innovationNo1 else 0
-        max_innovation2 = max(innovationNo2) if innovationNo2 else 0
-
-        excess_genes = {
-            inn for inn in innovationNo1 | innovationNo2
-            if (inn > max_innovation2 and inn in innovationNo1) or
-            (inn > max_innovation1 and inn in innovationNo2)
-        }
-
-        # Calculate the weight differences for matching genes
-        if match_genes:
-            W = sum(abs(inGenome[i].weight - repGenome[i].weight) for i in match_genes) / len(match_genes)
+    @classmethod
+    def get_new_id(cls, previous_id=None):
+        if previous_id is None:
+            cls.id += 1
+            return cls.id
         else:
-            W = 0.0
+            return previous_id
 
-        # Normalization factor
-        N = max(len(genome.conn), len(self.rep.conn))
+
+    def average_fitness(self):
+        if not self.genomes:
+            return 0.0  # safe fallback if no genomes exist
+
+        sum_fitness = 0.0
+        count = 0
+        for g in self.genomes:
+            if g.fitness is not None:
+                sum_fitness += g.fitness
+                count += 1
+
+        if count == 0:
+            return 0.0  # all fitness values were None
+
+        current = sum_fitness / count
+
+        if current > self.last_avg_fitness:
+            self.last_avg_fitness = current
+            self.no_improvement_age = 0
+        else:
+            self.no_improvement_age += 1
+
+        return current
+
         
+    def reproduce(self):
+        offspring = []
+        self.age += 1
 
-        # Ensure N is not zero to avoid division by zero
-        if N == 0:
-            print(genome.conn,self.rep.conn)
-            print(N)
-            raise ValueError("Cannot calculate compatibility distance: both genomes have zero connections.")
+        assert self.spawn_amount > 0 
 
-        # Number of excess and disjoint genes
-        E = len(excess_genes)
-        D = len(disjoint_genes)
+        self.genomes.sort(key=lambda g: g.fitness, reverse=True)
 
-        # Compatibility distance
-        delta = (c1 * E) / N + (c2 * D) / N + c3 * W
-        return delta
+        if Config.elitism:
+            offspring.append(self.genomes[0])
+            self.spawn_amount -= 1
+
+        survivors = int(round(len(self.genomes)*Config.survival_threshold))
+        if survivors > 0:
+            self.genomes = self.genomes[:survivors]
+        else:
+            self.genomes = self.genomes[:1]
+        
+        while(self.spawn_amount> 0):
+            self.spawn_amount -=1
+            if len(self.genomes) > 1:
+                parent1 =  choice(self.genomes)
+                parent2 = choice(self.genomes)
+                parent1.crossover(parent2)
+                offspring.append(parent1.mutate())
+            else:
+                parent1 = self.genomes[0]
+                parent1.crossover(parent1)
+                offspring.append(parent1.mutate())
+        self.genomes = []
+        self.rep = choice(offspring)
+        return offspring
