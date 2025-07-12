@@ -32,15 +32,17 @@ class Population(object):
     def speciate(self):
         for genome in self.genomes:
             found = False
-            
             for s in self.species:
-                if s.rep is None:
-                    s.rep = genome
-                if genome.distance(s.rep.conn) < Config.compatibility_threshold:
-                    s.genomes.append(genome)
+                if genome.distance(s.rep) < Config.compatibility_threshold:
+                    s.add(genome)
                     found = True
+                    break
             if not found:
                 self.species.append(Specie(rep=genome))
+
+        for s in self.species:
+            if len(s) == 0:
+                self.species.remove(s)
 
         self.set_compatibility_threshlod()
 
@@ -101,7 +103,7 @@ class Population(object):
 
             for s in self.species:
                 s.hasBest = False
-                if best in s.genomes:
+                if best.species_id == s.id:
                     s.hasBest = True
             save_model(best)
 
@@ -111,27 +113,26 @@ class Population(object):
                     if not s.hasBest:
                         self.species.remove(s)
                         for g in self.genomes[:]:
-                            if g in s.genomes:
+                            if g.species_id == s.id:
                                 self.genomes.remove(g)
                 if s.no_improvement_age > 2 * Config.max_stagnation:
                     self.species.remove(s)
                     for g in self.genomes[:]:
-                        if g in s.genomes:
+                        if g.species_id == s.id:
                             self.genomes.remove(g)
 
             self.compute_spawn_levels()
             for s in self.species:
                 if s.spawn_amount == 0:
                     for g in self.genomes[:]:
-                        if g in s.genomes:
+                        if g.species_id == s.id:
                             self.genomes.remove(g)
             
 
             self.log_species()
             new_population = []
             for s in self.species:
-                if s.spawn_amount > 0:
-                    new_population.extend(s.reproduce())
+                new_population.extend(s.reproduce())
             
 
             fill = Config.pop_size - len(new_population)
@@ -144,13 +145,10 @@ class Population(object):
                     parent1 = random.choice(self.genomes)
                     found = False
                     for c in self.genomes:
-                        for s in self.species:
-                            if c in s.genomes and parent1 in s.genomes:
-                                parent1.crossover(c)
-                                new_population.append(parent1.mutate())
-                                found = True
-                                break
-                        if found:
+                        if c.species_id == parent1.species_id:
+                            parent1.crossover(c)
+                            new_population.append(parent1.mutate())
+                            found = True
                             break
                     if not found:
                         new_population.append(parent1.mutate())
@@ -160,4 +158,17 @@ class Population(object):
             assert Config.pop_size == len(new_population), 'Different population sizes!'
             self.genomes = new_population
 
-        
+if __name__ ==  '__main__' :
+    
+    # sample fitness function
+    def eval_fitness(population):
+        for individual in population:
+            individual.fitness = 1.0
+            
+    # set fitness function 
+    Population.evaluate = eval_fitness
+    
+    # creates the population
+    pop = Population()
+    # runs the simulation for 250 epochs
+    pop.epoch(250)
