@@ -20,6 +20,14 @@ class Specie:
         self.last_avg_fitness = 0
         self.spawn_amount = 0
 
+    def add(self,genome: Genome):
+        genome.species_id = self.id
+        self.genomes.append(genome)
+        self.rep = choice(self.genomes)
+    
+    def __len__(self):
+        return len(self.genomes)
+
     @classmethod
     def get_new_id(cls, previous_id=None):
         if previous_id is None:
