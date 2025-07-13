@@ -1,4 +1,4 @@
-from random import choice, randrange, gauss, random
+from random import choice, randrange, gauss, random, randint
 from neat.node import Node
 from neat.connection import Connection
 from neat.config import Config
@@ -15,6 +15,7 @@ class Genome(object):
         self.nodes = node
         self.conn = connection
         self.fitness = 0
+        self.species_id = None
         self.next_node_id = Config.input_nodes + Config.hidden_nodes + Config.output_nodes
 
     def mutate(self):
@@ -26,14 +27,15 @@ class Genome(object):
             for c in self.conn:
                 c.mutate()
             for n in self.nodes:
-                n.mutate()
+                if n.type != 'INPUT':
+                    n.mutate()
 
     def distance(self, other):
-        if len(self.conn) > len(other):
+        if len(self.conn) > len(other.conn):
             parent1 = self.conn
-            parent2 = other
+            parent2 = other.conn
         else:
-            parent1 = other
+            parent1 = other.conn
             parent2 = self.conn
 
         weight_diff =0
@@ -84,8 +86,9 @@ class Genome(object):
             if node.type != 'OUTPUT':
                 continue
             input_node = choice(input_nodes)
-            wight = gauss(0,0.9)
+            wight = gauss(0,Config.weight_stdev)
             conn.append(Connection(input_id=input_node.id,out_id=node.id,weight=wight,enable=True))
+        # print(conn)
         
         return Genome(node=nodes, connection=conn)
 
@@ -124,61 +127,74 @@ class Genome(object):
         """
         Performs crossover between two genomes to produce a new genome.
         """
+        assert self.species_id == parent2.species_id
+
         conn1 = {conn.innoNo: conn for conn in self.conn}
         conn2 = {conn.innoNo: conn for conn in parent2.conn}
         new_conn =[]
         for key , v in conn1.items():
             conn = conn2.get(key)
-            if conn is None:
-                new_conn.append(v)
+            if conn != None:
+                if key == conn.innoNo:
+                    new_conn.append(self.connection_crossover(v,conn))
+                else:
+                    new_conn.append(v.copy())
             else:
-                new_conn.append(self.connection_crossover(v,conn))
+                new_conn.append(v.copy())
+        self.conn=new_conn
         
         node1 = {node.id: node for node in self.nodes}
         node2 = {node.id: node for node in parent2.nodes}
         new_nodes = []
+        # print(node2)
         for key, v in node1.items():
-            node  = node2.get(key)
-            if node is None:
+            # print(key)
+            try:
+               node = node2.get(key)
+            except KeyError:
                 new_nodes.append(v)
             else:
-                new_nodes.append(self.node_crossover(v, node))
-
+                if node != None:
+                    if key ==node.id:
+                        new_nodes.append(self.node_crossover(v, node))
+                    else:
+                        new_nodes.append(v)
+                else:
+                    new_nodes.append(v)
+                
+        # print(new_nodes)
         self.next_node_id = max(self.next_node_id,parent2.next_node_id)
         self.nodes=new_nodes
-        self.conn=new_conn
+        
 
 
     def addConnection(self):
-        if len(self.nodes) < 2:
-            return
-        n1 = choice(self.nodes)
-        n2 = choice(self.nodes)
+        num_h = len([h for h in self.nodes if h.type == 'HIDDEN'])
+        num_o = len(self.nodes) - Config.input_nodes - num_h
 
-        if n1.id == n2.id:
-            return
+        total_possible_conns = (num_h+num_o)*(Config.input_nodes+num_h) -sum(range(num_h+1)) 
+        rem_conns = total_possible_conns - len(self.conn)
+        conns = [(c.inId,c.outId) for c in self.conn]
+        if rem_conns >0:
+            n = randint(0,rem_conns-1)
+            count =0
+            for in_node in (self.nodes[:Config.input_nodes]+self.nodes[-num_h:]):
+                for out_node in self.nodes[Config.input_nodes:]:
+                    if (in_node,out_node) not in conns and self.__is_connection_feedforward(in_node, out_node):
+                        if count == n:
+                            weight = gauss(0,1)
+                            cg = Connection(in_node,out_node,weight,enable=True)
+                            self.conn.append(cg)
+                            return
+                        else:
+                            count += 1
+    
+    def __is_connection_feedforward(self, in_node, out_node):
         
-        if n1.type == 'OUTPUT' and n2.type == 'OUTPUT':
-            return
-        if n1.type == 'INPUT' and n2.type == 'INPUT':
-            return
-        if n1.type == 'OUTPUT' or n2.type =='INPUT':
-            n1,n2 =n2, n1
-        
-        for c in self.conn:
-            if (c.inId == n1.id and c.outId == n2.id and c.enable) or (c.inId == n2.id and c.outId == n1.id and c.enable):
-                return
-            
-        if cycle_check(self.conn, (n1.id, n2.id)):
-            return
-        
-        new_connection = Connection(
-            input_id=n1.id,
-            out_id=n2.id,
-            enable=True,
-            weight=randrange(-1, 1)
-        )
-        self.conn.append(new_connection)
+        return in_node.type == 'INPUT' or out_node.type == 'OUTPUT' or \
+          in_node.id <out_node.id
+
+
 
     def removeConnection(self):
         if len(self.conn) < 2:
@@ -189,23 +205,22 @@ class Genome(object):
         del conn_to_remove
 
     def addNode(self):
-        if not self.conn:
-            return
         old_conn = choice(self.conn)
-        old_conn.enable = False
         new_node = Node(idno=len(self.nodes), ntype='HIDDEN')
+        new_node.actfun = Config.nn_activation
         self.nodes.append(new_node)
+        old_conn.enable = False
         new_conn1 = Connection(
             input_id=old_conn.inId,
             out_id=new_node.id,
             enable=True,
-            weight=old_conn.weight
+            weight=1
         )
         new_conn2 = Connection(
             input_id=new_node.id,
             out_id=old_conn.outId,
             enable=True,
-            weight=1
+            weight=old_conn.weight
         )
         self.conn.append(new_conn1)
         self.conn.append(new_conn2)
