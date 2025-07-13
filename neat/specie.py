@@ -16,9 +16,13 @@ class Specie:
         self.staleness = 0.0
         self.hasBest = False
         self.no_improvement_age = 0
+        self.add(rep)
         self.compatibility_threshold = 3.0
         self.last_avg_fitness = 0
         self.spawn_amount = 0
+
+    def __str__(self):
+        return f"rep--> {self.rep} \n genomes --> {self.genomes}"
 
     def add(self,genome: Genome):
         genome.species_id = self.id
@@ -74,7 +78,7 @@ class Specie:
             offspring.append(self.genomes[0])
             self.spawn_amount -= 1
 
-        survivors = int(round(len(self.genomes)*Config.survival_threshold))
+        survivors = int(round(len(self)*Config.survival_threshold))
         if survivors > 0:
             self.genomes = self.genomes[:survivors]
         else:
@@ -82,9 +86,10 @@ class Specie:
         
         while(self.spawn_amount> 0):
             self.spawn_amount -=1
-            if len(self.genomes) > 1:
+            if len(self) > 1:
                 parent1 =  choice(self.genomes)
                 parent2 = choice(self.genomes)
+                assert parent1.species_id == parent2.species_id
                 parent1.crossover(parent2)
                 offspring.append(parent1.mutate())
             else:
@@ -92,5 +97,6 @@ class Specie:
                 parent1.crossover(parent1)
                 offspring.append(parent1.mutate())
         self.genomes = []
-        self.rep = choice(offspring)
+        self.rep = choice(offspring) 
+        print("offspring=",offspring)
         return offspring
