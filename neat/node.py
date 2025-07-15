@@ -20,8 +20,10 @@ class Node:
 
     def mutate_bias(self):
         self.bias += gauss(0, 1) * Config.bias_mutation_power
-        self.bias = max(Config.min_weight, min(self.bias, Config.max_weight))
+        if self.bias > Config.max_weight:
+            self.bias = Config.max_weight
+        elif self.bias < Config.min_weight:
+            self.bias = Config.min_weight
 
     def mutate_response(self):
-        self.response += gauss(0, 1) * Config.bias_mutation_power
-        self.response = max(Config.min_weight, min(self.response, Config.max_weight))
+       self.response += gauss(0,1)*Config.bias_mutation_power
