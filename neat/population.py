@@ -30,8 +30,10 @@ class Population(object):
 
 
     def speciate(self):
+        # print(self.genomes)
         for genome in self.genomes:
             found = False
+            # print(genome)
             for s in self.species:
                 if genome.distance(s.rep) < Config.compatibility_threshold:
                     s.add(genome)
@@ -71,7 +73,7 @@ class Population(object):
                 species_stats.append(s.average_fitness())
         total_average = 0.0 
         for s in species_stats:
-            total_average +=5
+            total_average += s
 
         for i, s in enumerate(self.species):
             s.spawn_amount = int(round((species_stats[i]*Config.pop_size/total_average)))
@@ -132,7 +134,9 @@ class Population(object):
             self.log_species()
             new_population = []
             for s in self.species:
-                new_population.extend(s.reproduce())
+                new_population = s.reproduce()
+            
+
             
 
             fill = Config.pop_size - len(new_population)
@@ -147,15 +151,18 @@ class Population(object):
                     for c in self.genomes:
                         if c.species_id == parent1.species_id:
                             parent1.crossover(c)
-                            new_population.append(parent1.mutate())
+                            parent1.mutate()
+                            new_population.append(parent1)
                             found = True
                             break
                     if not found:
-                        new_population.append(parent1.mutate())
+                        parent1.mutate()
+                        new_population.append(parent1)
                     fill -= 1
 
             print(f"Species: {len(self.species)}, Population: {len(new_population)}")  # Debugging statement
             assert Config.pop_size == len(new_population), 'Different population sizes!'
+            self.species =[]
             self.genomes = new_population
 
 if __name__ ==  '__main__' :
