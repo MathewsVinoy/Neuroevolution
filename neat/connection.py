@@ -24,7 +24,7 @@ class Connection:
     @classmethod
     def track_innovation(cls, in_id, out_id):
         key = (in_id, out_id)
-        if key not in cls.innovation_tracker:
+        if key not in cls.innovation_tracker.keys():
             cls.innovation_tracker[key] = cls.innovation_no
             cls.innovation_no += 1
         return cls.innovation_tracker[key]
@@ -38,5 +38,10 @@ class Connection:
     def mutate_weight(self):
         self.weight += gauss(0, 1) * Config.weight_mutation_power
 
-        # Clamp weight
-        self.weight = max(Config.min_weight, min(self.weight, Config.max_weight))
+        if self.weight > Config.max_weight:
+            self.weight = Config.max_weight
+        elif self.weight < Config.min_weight:
+            self.weight = Config.min_weight
+
+    def copy(self):
+        return Connection(self.inId,self.outId, self.weight, self.enable)
