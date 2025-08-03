@@ -1,0 +1,6 @@
+digraph {
+	0 [label=INPUT_0]
+	1 [label=INPUT_1]
+	2 [label=OUTPUT_2]
+	1 -> 2 [label=0.71]
+}
