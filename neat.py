@@ -60,10 +60,23 @@ class Network:
         self.no_output = 1
 
     def activate(self, input_vector):
-        for n in self.genome.nodes:
-            if n.type == "INPUT":
-                n.value = input_vector[n.id]
-        print([n.type for n in self.genome.nodes])
+        # Reset node values
+        for node in self.genome.nodes:
+            node.value = 0
+
+        # Set input values
+        for i, value in enumerate(input_vector):
+            self.genome.nodes[i].value = value
+
+        # Activate connections
+        for conn in self.genome.conns:
+            if conn.enable:
+                in_node = next(n for n in self.genome.nodes if n.id == conn.links[0])
+                out_node = next(n for n in self.genome.nodes if n.id == conn.links[1])
+                out_node.value += in_node.value * conn.weight
+
+        # Return output values
+        return [n.value for n in self.genome.nodes if n.type == "OUTPUT"]
 
 
 class Population:
