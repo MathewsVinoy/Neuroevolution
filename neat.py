@@ -122,7 +122,8 @@ if __name__ == "__main__":
     p = Population()
     g = p.genomes[0]
     nn = Network(g)
-    nn.activate([1, 0])
+    out =nn.activate([1, 0])
+    print("OutPut:",out)
 
     d = Digraph()
     for n in g.nodes:
