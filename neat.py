@@ -54,6 +54,7 @@ class Genome:
         self.nodes = nodes  # List of Node instances
         self.conns = conns  # List of Conn instances
         self.fitness = 0
+        self.specie_id = None
 
     @classmethod
     def _set_id(cls):
@@ -101,20 +102,77 @@ class Genome:
 class Specie:
     _id = -1
 
-    def __init__(self, genomes):
+    def __init__(self, rep: Genome):
         self.id = self._set_id()
-        self.genomes = genomes
+        self.genomes = []
+        self.add(rep)
+        self.age = 0
         self.rep = self._get_representative()
+        self.hasbest = False
+        self.no_improvement_age = 0
+        self.spawn_amount =0
+        self.last_avg_fitness = 0
+
+    def average_fitness(self):
+        if not self.genomes:
+            return 0.0  # safe fallback if no genomes exist
+
+        sum_fitness = 0.0
+        count = 0
+        for g in self.genomes:
+            if g.fitness is not None:
+                sum_fitness += g.fitness
+                count += 1
+
+        if count == 0:
+            return 0.0  # all fitness values were None
+
+        current = sum_fitness / count
+
+        if current > self.last_avg_fitness:
+            self.last_avg_fitness = current
+            self.no_improvement_age = 0
+        else:
+            self.no_improvement_age += 1
+
+        return current
+
+        
 
     def _get_representative(self):
         if not self.genomes:
             return None
         return max(self.genomes, key=lambda g: g.fitness)
 
+
     @classmethod
     def _set_id(cls):
         cls._id += 1
         return cls._id
+
+    def add(self, g):
+        g.specie_id = self.id 
+        self.genomes.append(g)
+
+    def reproduce(self):
+        offspring = []
+        self.age += 1
+
+        assert self.spawn_amount > 0 
+
+        self.genomes.sort(key=lambda g: g.fitness, reverse=True)
+
+        elitism = 1
+        if elitism:
+            offspring.append(self.genomes[0])
+            self.spawn_amount -= 1
+
+        survivors = int(round(len(self)*0.2))
+        if survivors > 0:
+            self.genomes = self.genomes[:survivors]
+        else:
+            self.genomes = self.genomes[:1]
+         
 
 
 class Network:
@@ -176,13 +234,12 @@ class Population:
             found = False
             for s in self.species:
                 if g.distance(s.rep) < self._compatibility_threshold:
-                    s.genomes.append(g)
+                    s.add(g)
+
                     found = True
                     break
             if not found:
-                self.species.append(Specie([g]))
-
-        
+                self.species.append(Specie(g))
 
         self._set_compatibility_threshold()
 
@@ -198,6 +255,22 @@ class Population:
         for g in self.genomes:
             sum += g.fitness
         return sum/len(self.genomes)
+
+    def compute_spawn_levels(self):
+        species_stats =[]
+        for s in self.species:
+            if s.age < 10:
+                species_stats.append(s.average_fitness()*1.2)
+            elif s.age > 30:
+                species_stats.append(s.average_fitness()*0.2)
+            else:
+                species_stats.append(s.average_fitness())
+        total_average = 0.0 
+        for s in species_stats:
+            total_average += s
+
+        for i, s in enumerate(self.species):
+            s.spawn_amount = int(round((species_stats[i]*50/total_average)))
         
 
     def epochs(self,size=10):
@@ -209,6 +282,37 @@ class Population:
             self.best_fitness.append(max(self.genomes, key=lambda g: g.fitness))
             self.avg_fitness.append(self.avg_fitness_fn())
             best = self.best_fitness[-1]
+
+            for s in self.species:
+                s.hasbest = False
+                if best.specie_id == s.id:
+                    s.hasbest = True
+            for s in self.species:
+                if s.no_improvement_age > 15:
+                    if not s.hasbest:
+                        for g in self.genomes:
+                            if g.specie_id == s.id:
+                                self.genomes.remove(g)
+                        self.species.remove(s)
+                if s.no_improvement_age > 2 * 15:
+                    for g in self.genomes:
+                        if g.specie_id == s.id:
+                            self.genomes.remove(g)
+                    self.species.remove(s)
+            
+            self.compute_spawn_levels()
+            for s in self.species:
+                if s.spawn_amount == 0:
+                    for g in self.genomes[:]:
+                        if g.specie_id == s.id:
+                            self.genomes.remove(g)
+                
+            print("no of genomes:=> ", len(self.genomes))
+
+            new_population = []
+            for s in self.species:
+                new_population = s.reproduce()
+
             
 
 
@@ -239,6 +343,8 @@ if __name__ == "__main__":
     nn = Network(g)
     out =nn.activate([1, 0])
     print("OutPut:",out)
+
+    print("Species id",g.specie_id)
     
 
     d = Digraph()
