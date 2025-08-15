@@ -17,6 +17,18 @@ class Node:
         self.value = 0
         self.type = type
 
+    def mutate(self):
+        if random() < Config.prob_mutatebias:
+            self.mutate_bias()
+
+    def mutate_bias(self):
+        self.bias += gauss(0, 1) * Config.bias_mutation_power
+        if self.bias > Config.max_weight:
+            self.bias = Config.max_weight
+        elif self.bias < Config.min_weight:
+            self.bias = Config.min_weight
+
+
 
 
 class Conn:
@@ -33,7 +45,7 @@ class Conn:
             cls._inno_count += 1
         return cls._innovation_tracker[links]
 
-    def __init__(self, links, weight=None, enable=True, inno_no=None):
+    def __init__(self, links, weight=None, enable=True):
         self.links = tuple(links)  # (in_node_id, out_node_id)
         self.in_node, self.out_node = self.links
         self.inno_no = Conn.innovation_for(self.links)
@@ -43,6 +55,20 @@ class Conn:
     @classmethod
     def innovation_tracker(cls, links):
         return cls.innovation_for(links)
+    
+    def mutate(self):
+        if random() < Config.prob_mutate_weight:
+            self.mutate_weight()
+        if random() < Config.prob_togglelink:
+            self.enable = True  # Could toggle, but you force-enable here
+
+    def mutate_weight(self):
+        self.weight += random.gauss(0, 1) * Config.weight_mutation_power
+
+        if self.weight > Config.max_weight:
+            self.weight = Config.max_weight
+        elif self.weight < Config.min_weight:
+            self.weight = Config.min_weight
         
 
 
@@ -97,6 +123,90 @@ class Genome:
 
         return distance
 
+    def node_crossover(self, parent1: Node, parent2: Node) -> Node:
+        """
+        Performs crossover between two nodes to produce a new node.
+        """
+        assert parent1.id == parent2.id
+        bias = random.choice([parent1.bias, parent2.bias])
+        act_fun = random.choice([parent1.actfun, parent2.actfun])
+        n = Node(idno=parent1.id, ntype=parent1.type)
+        n.actfun = act_fun
+        n.bias = bias
+        return n
+
+    def connection_crossover(
+        self, parent1, parent2
+    ) :
+        """
+        Performs crossover between two connections to produce a new connection.
+        """
+        assert parent1.innoNo == parent2.innoNo
+        weight = random.choice([parent1.weight, parent2.weight])
+        enable = random.choice([parent1.enable, parent2.enable])
+        out = Conn(
+            enable=enable,
+            links=parent1.links,
+            weight=weight,
+        )
+        out.innoNo = parent1.innoNo
+        return out
+
+    def crossover(self, parent2):
+        """
+        Performs crossover between two genomes to produce a new genome.
+        """
+        assert self.species_id == parent2.species_id
+
+        conn1 = {conn.innoNo: conn for conn in self.conn}
+        conn2 = {conn.innoNo: conn for conn in parent2.conn}
+        new_conn = []
+        for key, v in conn1.items():
+            conn = conn2.get(key)
+            if conn != None:
+                if key == conn.innoNo:
+                    new_conn.append(self.connection_crossover(v, conn))
+                else:
+                    new_conn.append(v.copy())
+            else:
+                new_conn.append(v.copy())
+        self.conn = new_conn
+
+        node1 = {node.id: node for node in self.nodes}
+        node2 = {node.id: node for node in parent2.nodes}
+        new_nodes = []
+        # print(node2)
+        for key, v in node1.items():
+            # print(key)
+            try:
+                node = node2.get(key)
+            except KeyError:
+                new_nodes.append(v)
+            else:
+                if node != None:
+                    if key == node.id:
+                        new_nodes.append(self.node_crossover(v, node))
+                    else:
+                        new_nodes.append(v)
+                else:
+                    new_nodes.append(v)
+
+        # print(new_nodes)
+        self.next_node_id = max(self.next_node_id, parent2.next_node_id)
+        self.nodes = new_nodes
+
+
+    def mutate(self):
+        if random() < 0.03:
+            self.addNode()
+        elif random() < 0.05:
+            self.addConnection()
+        else:
+            for c in self.conn:
+                c.mutate()
+            for n in self.nodes:
+                if n.type != "INPUT":
+                    n.mutate()
 
 
 class Specie:
@@ -167,11 +277,33 @@ class Specie:
             offspring.append(self.genomes[0])
             self.spawn_amount -= 1
 
-        survivors = int(round(len(self)*0.2))
+        survivors = int(round(len(self.genomes)*0.2))
         if survivors > 0:
             self.genomes = self.genomes[:survivors]
         else:
             self.genomes = self.genomes[:1]
+
+        while(self.spawn_amount> 0):
+            self.spawn_amount -=1
+            if len(self.genomes) > 1:
+                parent1 =  random.choice(self.genomes)
+                parent2 = random.choice(self.genomes)
+                assert parent1.specie_id == parent2.specie_id
+                parent1.crossover(parent2)
+                parent1.mutate()
+                offspring.append(parent1)
+            else:
+                parent1 = self.genomes[0]
+                parent1.crossover(parent1)
+                parent1.mutate()
+                offspring.append(parent1)
+    
+        # print("offspring=",offspring)
+        
+        self.genomes = []
+        self.rep = self._get_representative()
+
+        return offspring
          
 
 
