@@ -4,29 +4,29 @@ import random
 
 from graphviz import Digraph
 
-def sigmoid_activation(z):
-    z = max(-60.0, min(60.0, 5.0 * z))
-    return 1.0 / (1.0 + math.exp(-z))
+def exp_activation(z):
+    z = max(-60.0, min(60.0, z))
+    return math.exp(z)
 
 
 class Node:
     def __init__(self, id, type):
         self.id = id
         self.bias = 0
-        self.act_fn = sigmoid_activation
+        self.act_fn = exp_activation
         self.value = 0
         self.type = type
 
     def mutate(self):
-        if random() < Config.prob_mutatebias:
+        if random.random() < 0.20:
             self.mutate_bias()
 
     def mutate_bias(self):
-        self.bias += gauss(0, 1) * Config.bias_mutation_power
-        if self.bias > Config.max_weight:
-            self.bias = Config.max_weight
-        elif self.bias < Config.min_weight:
-            self.bias = Config.min_weight
+        self.bias += random.gauss(0, 1) * 0.50
+        if self.bias > 30:
+            self.bias = 30
+        elif self.bias < -30:
+            self.bias = -30
 
 
 
@@ -57,18 +57,21 @@ class Conn:
         return cls.innovation_for(links)
     
     def mutate(self):
-        if random() < Config.prob_mutate_weight:
+        if random.random() < 0.90:
             self.mutate_weight()
-        if random() < Config.prob_togglelink:
+        if random.random() < 0.01:
             self.enable = True  # Could toggle, but you force-enable here
 
     def mutate_weight(self):
-        self.weight += random.gauss(0, 1) * Config.weight_mutation_power
+        self.weight += random.gauss(0, 1) * 0.50
 
-        if self.weight > Config.max_weight:
-            self.weight = Config.max_weight
-        elif self.weight < Config.min_weight:
-            self.weight = Config.min_weight
+        if self.weight > 30:
+            self.weight = 30
+        elif self.weight <-30:
+            self.weight =-30
+
+    def copy(self):
+        return Conn(self.links,self.weight,self.enable)
         
 
 
@@ -129,9 +132,9 @@ class Genome:
         """
         assert parent1.id == parent2.id
         bias = random.choice([parent1.bias, parent2.bias])
-        act_fun = random.choice([parent1.actfun, parent2.actfun])
-        n = Node(idno=parent1.id, ntype=parent1.type)
-        n.actfun = act_fun
+        act_fun = random.choice([parent1.act_fn, parent2.act_fn])
+        n = Node(parent1.id,parent1.type)
+        n.act_fn = act_fun
         n.bias = bias
         return n
 
@@ -141,7 +144,7 @@ class Genome:
         """
         Performs crossover between two connections to produce a new connection.
         """
-        assert parent1.innoNo == parent2.innoNo
+        assert parent1.inno_no == parent2.inno_no
         weight = random.choice([parent1.weight, parent2.weight])
         enable = random.choice([parent1.enable, parent2.enable])
         out = Conn(
@@ -149,28 +152,25 @@ class Genome:
             links=parent1.links,
             weight=weight,
         )
-        out.innoNo = parent1.innoNo
+        out.inno_no = parent1.inno_no
         return out
 
     def crossover(self, parent2):
         """
         Performs crossover between two genomes to produce a new genome.
         """
-        assert self.species_id == parent2.species_id
+        assert self.specie_id == parent2.specie_id
 
-        conn1 = {conn.innoNo: conn for conn in self.conn}
-        conn2 = {conn.innoNo: conn for conn in parent2.conn}
-        new_conn = []
+        conn1 = {conn.inno_no: conn for conn in self.conns}
+        conn2 = {conn.inno_no: conn for conn in parent2.conns}
+        new_conns = []
         for key, v in conn1.items():
-            conn = conn2.get(key)
-            if conn != None:
-                if key == conn.innoNo:
-                    new_conn.append(self.connection_crossover(v, conn))
-                else:
-                    new_conn.append(v.copy())
+            c2 = conn2.get(key)
+            if c2 is not None and key == c2.inno_no:
+                new_conns.append(self.connection_crossover(v, c2))
             else:
-                new_conn.append(v.copy())
-        self.conn = new_conn
+                new_conns.append(v.copy())
+        self.conns = new_conns
 
         node1 = {node.id: node for node in self.nodes}
         node2 = {node.id: node for node in parent2.nodes}
@@ -191,22 +191,86 @@ class Genome:
                 else:
                     new_nodes.append(v)
 
-        # print(new_nodes)
-        self.next_node_id = max(self.next_node_id, parent2.next_node_id)
         self.nodes = new_nodes
 
 
     def mutate(self):
-        if random() < 0.03:
+        if random.random() < 0.03:
             self.addNode()
-        elif random() < 0.05:
+        elif random.random() < 0.05:
             self.addConnection()
         else:
-            for c in self.conn:
+            for c in self.conns:
                 c.mutate()
             for n in self.nodes:
                 if n.type != "INPUT":
                     n.mutate()
+    
+    def addNode(self):
+        if not self.conns:
+            return
+        old_conn = random.choice(self.conns)
+        # Create and register the new hidden node
+        n1 = Node(len(self.nodes), "HIDDEN")
+        self.nodes.append(n1)
+
+        # Split the old connection
+        c1 = Conn(
+            links=(old_conn.links[0], n1.id),
+            weight=1,
+            enable=True,
+        )
+        c2 = Conn(
+            links=(n1.id, old_conn.links[1]),
+            weight=old_conn.weight,
+            enable=True,
+        )
+        old_conn.enable = False
+        # Replace old connection with the two new ones
+        self.conns.remove(old_conn)
+        self.conns.append(c1)
+        self.conns.append(c2)
+
+    def addConnection(self):
+        n1, n2 = random.sample(self.nodes, 2)
+        if n1.id == n2.id:
+            return
+
+        # Normalize direction: avoid INPUT as target and OUTPUT as source
+        if ((n1.id > n2.id and n1.type == "HIDDEN" and n2.type == "HIDDEN")
+            or n2.type == "INPUT" or n1.type == "OUTPUT"):
+            n1, n2 = n2, n1
+
+        # Avoid cycles
+        if self.check_cycle((n1, n2)):
+            return
+
+        # Avoid duplicate
+        if any(c.links == (n1.id, n2.id) for c in self.conns):
+            return
+
+        self.conns.append(Conn(
+            links=(n1.id, n2.id),
+            enable=True,
+            weight=random.uniform(-1, 1),
+        ))
+    
+    def check_cycle(self, node):
+        # node is a tuple (source_node, target_node)
+        def dfs(current_id, target_id, visited, conns):
+            if current_id == target_id:
+                return True
+            visited.add(current_id)
+            for conn in conns:
+                if conn.enable and conn.links[0] == current_id:
+                    nxt = conn.links[1]
+                    if nxt not in visited and dfs(nxt, target_id, visited, conns):
+                        return True
+            return False
+
+        source = node[0].id
+        target = node[1].id
+        return dfs(target, source, set(), self.conns)
 
 
 class Specie:
@@ -215,13 +279,14 @@ class Specie:
     def __init__(self, rep: Genome):
         self.id = self._set_id()
         self.genomes = []
-        self.add(rep)
+        self.rep = rep  # keep given representative
         self.age = 0
-        self.rep = self._get_representative()
         self.hasbest = False
         self.no_improvement_age = 0
-        self.spawn_amount =0
+        self.spawn_amount = 0
         self.last_avg_fitness = 0
+        if rep is not None:
+            self.add(rep)
 
     def average_fitness(self):
         if not self.genomes:
@@ -261,47 +326,56 @@ class Specie:
         return cls._id
 
     def add(self, g):
-        g.specie_id = self.id 
+        g.specie_id = self.id
         self.genomes.append(g)
 
     def reproduce(self):
         offspring = []
         self.age += 1
 
-        assert self.spawn_amount > 0 
+        assert self.spawn_amount > 0
 
+        # Sort by fitness (descending)
         self.genomes.sort(key=lambda g: g.fitness, reverse=True)
+        best_parent = self.genomes[0] if self.genomes else None
 
+        # Elitism
         elitism = 1
-        if elitism:
-            offspring.append(self.genomes[0])
+        if elitism and best_parent is not None:
+            offspring.append(copy.deepcopy(best_parent))
             self.spawn_amount -= 1
 
-        survivors = int(round(len(self.genomes)*0.2))
+        # Truncate to survivors
+        survivors = int(round(len(self.genomes) * 0.2))
         if survivors > 0:
             self.genomes = self.genomes[:survivors]
         else:
             self.genomes = self.genomes[:1]
 
-        while(self.spawn_amount> 0):
-            self.spawn_amount -=1
+        # Produce children
+        while self.spawn_amount > 0:
+            self.spawn_amount -= 1
             if len(self.genomes) > 1:
-                parent1 =  random.choice(self.genomes)
+                parent1 = random.choice(self.genomes)
                 parent2 = random.choice(self.genomes)
                 assert parent1.specie_id == parent2.specie_id
-                parent1.crossover(parent2)
-                parent1.mutate()
-                offspring.append(parent1)
+                child = copy.deepcopy(parent1)
+                child.crossover(parent2)
+                child.mutate()
+                offspring.append(child)
             else:
-                parent1 = self.genomes[0]
-                parent1.crossover(parent1)
-                parent1.mutate()
-                offspring.append(parent1)
-    
-        # print("offspring=",offspring)
-        
+                parent = self.genomes[0]
+                child = copy.deepcopy(parent)
+                child.crossover(parent)
+                child.mutate()
+                offspring.append(child)
+
+        # Keep representative stable across generations (use best parent)
+        if best_parent is not None:
+            self.rep = best_parent
+
+        # Clear members; they will be reassigned by Population.speciate()
         self.genomes = []
-        self.rep = self._get_representative()
 
         return offspring
          
@@ -319,19 +393,25 @@ class Network:
 
     def activate(self, input_vector):
         # Reset node values
+        id2node = {n.id: n for n in self.genome.nodes}
         for node in self.genome.nodes:
             node.value = 0
 
         # Set input values
         for i, value in enumerate(input_vector):
-            self.genome.nodes[i].value = value
+            # Assumes input nodes are the first ones or labeled as INPUT
+            if i < len(self.genome.nodes) and self.genome.nodes[i].type == "INPUT":
+                self.genome.nodes[i].value = value
 
-        # Activate connections
+        # Activate connections (skip dangling)
         for conn in self.genome.conns:
-            if conn.enable:
-                in_node = next(n for n in self.genome.nodes if n.id == conn.links[0])
-                out_node = next(n for n in self.genome.nodes if n.id == conn.links[1])
-                out_node.value += in_node.act_fn(in_node.value) * conn.weight
+            if not conn.enable:
+                continue
+            in_node = id2node.get(conn.links[0])
+            out_node = id2node.get(conn.links[1])
+            if in_node is None or out_node is None:
+                continue
+            out_node.value += in_node.act_fn(in_node.value) * conn.weight
 
         # Return output values
         return [n.value for n in self.genome.nodes if n.type == "OUTPUT"]
@@ -354,24 +434,42 @@ class Population:
         all_nodes = input_nodes + output_nodes
 
         for _ in range(50):
-            conn_links = []
+            conns = []
             in_node = random.choice(input_nodes)
             out_node = random.choice(output_nodes)
-            conn_links.append(Conn((in_node.id, out_node.id)))
-
-            self.genomes.append(Genome(copy.deepcopy(all_nodes), conn_links))
+            conns.append(Conn((in_node.id, out_node.id)))
+            self.genomes.append(Genome(copy.deepcopy(all_nodes), conns))
 
     def speciate(self):
-        for g  in self.genomes:
-            found = False
+        # If no species exist, seed with first genome and grow
+        if not self.species:
+            for g in self.genomes:
+                placed = False
+                for s in self.species:
+                    if s.rep is not None and g.distance(s.rep) < self._compatibility_threshold:
+                        s.add(g)
+                        placed = True
+                        break
+                if not placed:
+                    self.species.append(Specie(g))
+        else:
+            # Keep representatives but clear memberships
             for s in self.species:
-                if g.distance(s.rep) < self._compatibility_threshold:
-                    s.add(g)
+                s.genomes = []
 
-                    found = True
-                    break
-            if not found:
-                self.species.append(Specie(g))
+            # Reassign all genomes
+            for g in self.genomes:
+                placed = False
+                for s in self.species:
+                    if s.rep is not None and g.distance(s.rep) < self._compatibility_threshold:
+                        s.add(g)
+                        placed = True
+                        break
+                if not placed:
+                    self.species.append(Specie(g))
+
+            # Remove empty species
+            self.species = [s for s in self.species if s.genomes]
 
         self._set_compatibility_threshold()
 
@@ -389,20 +487,24 @@ class Population:
         return sum/len(self.genomes)
 
     def compute_spawn_levels(self):
-        species_stats =[]
+        species_stats = []
         for s in self.species:
             if s.age < 10:
-                species_stats.append(s.average_fitness()*1.2)
+                species_stats.append(s.average_fitness() * 1.2)
             elif s.age > 30:
-                species_stats.append(s.average_fitness()*0.2)
+                species_stats.append(s.average_fitness() * 0.2)
             else:
                 species_stats.append(s.average_fitness())
-        total_average = 0.0 
-        for s in species_stats:
-            total_average += s
+        total_average = sum(species_stats) if species_stats else 0.0
+        if total_average == 0.0:
+            # Split evenly to maintain population size 50
+            even = int(round(50 / max(1, len(self.species))))
+            for s in self.species:
+                s.spawn_amount = even
+            return
 
         for i, s in enumerate(self.species):
-            s.spawn_amount = int(round((species_stats[i]*50/total_average)))
+            s.spawn_amount = int(round((species_stats[i] * 50 / total_average)))
         
 
     def epochs(self,size=10):
@@ -416,35 +518,34 @@ class Population:
             best = self.best_fitness[-1]
 
             for s in self.species:
-                s.hasbest = False
-                if best.specie_id == s.id:
-                    s.hasbest = True
-            for s in self.species:
-                if s.no_improvement_age > 15:
-                    if not s.hasbest:
-                        for g in self.genomes:
-                            if g.specie_id == s.id:
-                                self.genomes.remove(g)
-                        self.species.remove(s)
-                if s.no_improvement_age > 2 * 15:
-                    for g in self.genomes:
-                        if g.specie_id == s.id:
-                            self.genomes.remove(g)
+                s.hasbest = (best.specie_id == s.id)
+
+            for s in self.species[:]:
+                if s.no_improvement_age > 15 and not s.hasbest:
+                    # remove species and its genomes
+                    self.genomes = [g for g in self.genomes if g.specie_id != s.id]
                     self.species.remove(s)
-            
+                elif s.no_improvement_age > 30:
+                    self.genomes = [g for g in self.genomes if g.specie_id != s.id]
+                    self.species.remove(s)
+
             self.compute_spawn_levels()
+
+            # Remove genomes from species that won't spawn
             for s in self.species:
                 if s.spawn_amount == 0:
-                    for g in self.genomes[:]:
-                        if g.specie_id == s.id:
-                            self.genomes.remove(g)
-                
+                    self.genomes = [g for g in self.genomes if g.specie_id != s.id]
+
             print("no of genomes:=> ", len(self.genomes))
 
+            # Reproduce to build the next population
             new_population = []
             for s in self.species:
-                new_population = s.reproduce()
+                new_population.extend(s.reproduce())
 
+            # Replace population with offspring
+            self.genomes = new_population
+            print(len(self.genomes))
             
 
 
