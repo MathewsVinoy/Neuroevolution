@@ -236,21 +236,39 @@ class Genome:
         if n1.id == n2.id:
             return
 
-        # Normalize direction: avoid INPUT as target and OUTPUT as source
-        if ((n1.id > n2.id and n1.type == "HIDDEN" and n2.type == "HIDDEN")
-            or n2.type == "INPUT" or n1.type == "OUTPUT"):
-            n1, n2 = n2, n1
+        # Disallow connections between two inputs or two outputs
+        if n1.type == "INPUT" and n2.type == "INPUT":
+            return
+        if n1.type == "OUTPUT" and n2.type == "OUTPUT":
+            return
 
-        # Avoid cycles
-        if self.check_cycle((n1, n2)):
+        # Decide direction so that source is not OUTPUT and target is not INPUT
+        if n1.type == "INPUT" or n2.type == "OUTPUT":
+            source, target = n1, n2
+        elif n2.type == "INPUT" or n1.type == "OUTPUT":
+            source, target = n2, n1
+        else:
+            # Both are HIDDEN or one is HIDDEN and the other is INPUT/OUTPUT already handled.
+            # Randomize direction for hidden-hidden pairs but avoid creating an INPUT target or OUTPUT source
+            if random.random() < 0.5:
+                source, target = n1, n2
+            else:
+                source, target = n2, n1
+
+        # Prevent self-connection
+        if source.id == target.id:
             return
 
         # Avoid duplicate
-        if any(c.links == (n1.id, n2.id) for c in self.conns):
+        if any(c.links == (source.id, target.id) for c in self.conns):
+            return
+
+        # Avoid cycles: check if adding source->target would create a cycle
+        if self.check_cycle((source, target)):
             return
 
         self.conns.append(Conn(
-            links=(n1.id, n2.id),
+            links=(source.id, target.id),
             enable=True,
             weight=random.uniform(-1, 1),
         ))
@@ -382,39 +400,49 @@ class Specie:
 
 
 class Network:
-    def __init__(self, genome):
-        self.genome = genome
-        self.no_input = 2
-        self.no_output = 1
-    
+    """
+    Network (Phenotype):
+    Represents the expressed neural network constructed from a genome.
+    """
+
+    def __init__(self, genome: Genome):
+        self.nodes = genome.nodes
+        self.conn = [c for c in genome.conns if c.enable]  # Only enabled connections
+
     def reset(self):
-        for node in self.genome.nodes:
-            node.value = 0.0
+        for n in self.nodes:
+            n.output = 0.0
 
     def activate(self, input_vector):
-        # Reset node values
-        id2node = {n.id: n for n in self.genome.nodes}
-        for node in self.genome.nodes:
-            node.value = 0
+        assert len(input_vector) == 2, "Wrong number of inputs."
 
-        # Set input values
-        for i, value in enumerate(input_vector):
-            # Assumes input nodes are the first ones or labeled as INPUT
-            if i < len(self.genome.nodes) and self.genome.nodes[i].type == "INPUT":
-                self.genome.nodes[i].value = value
+        # Set input node outputs
+        input_index = 0
+        for n in self.nodes:
+            if n.type == 'INPUT':
+                n.output = input_vector[input_index]
+                input_index += 1
 
-        # Activate connections (skip dangling)
-        for conn in self.genome.conns:
-            if not conn.enable:
+        # Sort nodes in topological order if not already done
+        sorted_nodes = sorted(self.nodes, key=lambda x: x.type)
+
+        # Process non-input nodes
+        for node in sorted_nodes:
+            if node.type == 'INPUT':
                 continue
-            in_node = id2node.get(conn.links[0])
-            out_node = id2node.get(conn.links[1])
-            if in_node is None or out_node is None:
-                continue
-            out_node.value += in_node.act_fn(in_node.value) * conn.weight
 
-        # Return output values
-        return [n.value for n in self.genome.nodes if n.type == "OUTPUT"]
+            total_input = 0.0
+            for c in self.conn:
+                if c.links[1] == node.id:
+                    input_node = next((n for n in self.nodes if n.id == c.links[0]), None)
+                    if input_node is not None:
+                        total_input += c.weight * input_node.output
+
+            node.output = node.act_fn(total_input)
+
+        # Collect outputs
+        output_values = [n.output for n in self.nodes if n.type == 'OUTPUT']
+        return output_values
 
 
 class Population:
@@ -536,6 +564,9 @@ class Population:
                 if s.spawn_amount == 0:
                     self.genomes = [g for g in self.genomes if g.specie_id != s.id]
 
+            # Remove species with zero spawn amounts
+            self.species = [s for s in self.species if s.spawn_amount > 0]
+
             print("no of genomes:=> ", len(self.genomes))
 
             # Reproduce to build the next population
@@ -543,10 +574,28 @@ class Population:
             for s in self.species:
                 new_population.extend(s.reproduce())
 
-            # Replace population with offspring
+            fill = 50 - len(new_population)
+            if fill < 0:
+                new_population = new_population[:50]
+            if fill > 0:
+                while fill > 0:
+                    parent1 = random.choice(self.genomes)
+                    found = False
+                    for c in self.genomes:
+                        if c.specie_id == parent1.specie_id:
+                            parent1.crossover(c)
+                            parent1.mutate()
+                            new_population.append(parent1)
+                            found = True
+                            break
+                    if not found:
+                        parent1.mutate()
+                        new_population.append(parent1)
+                    fill -= 1
+            print(f"Species: {len(self.species)}, Population: {len(new_population)}")  # Debugging statement
+            assert 50 == len(new_population), 'Different population sizes!'
+            self.species =[]
             self.genomes = new_population
-            print(len(self.genomes))
-            
 
 
 
@@ -563,16 +612,52 @@ def evaluate_fitness(pop):
 
         g.fitness = 1 - math.sqrt(error / len(OUTPUTS))
 
+def test(best):
+    print("\n\n\n############# Test ##########")
+    print("Best genome fitness:", best.fitness)
+    nn = Network(best)
+
+    while True:
+        s = input("Enter two inputs (e.g. '0 1'), 'all' to test XOR cases, or 'q' to quit: ").strip()
+        if not s:
+            continue
+        if s.lower() in ("q", "quit", "exit"):
+            print("Exiting test.")
+            break
+
+        if s.lower() == "all":
+            cases = [[0, 0], [0, 1], [1, 0], [1, 1]]
+            for c in cases:
+                nn.reset()
+                out = nn.activate(c)
+                print(f"{c} -> {out}")
+            continue
+
+        s = s.replace(",", " ")
+        parts = s.split()
+        if len(parts) != 2:
+            print("Please enter two values separated by space or comma.")
+            continue
+        try:
+            vals = [float(parts[0]), float(parts[1])]
+        except ValueError:
+            print("Invalid numeric values.")
+            continue
+
+        nn.reset()
+        out = nn.activate(vals)
+        print(f"Input: {vals} -> Output: {out}")
+
+
 
 if __name__ == "__main__":
     # Create and visualize first genome
     p = Population()
     p.evaluate_fitness = evaluate_fitness
-    p.epochs(2)
+    p.epochs(50)
+    print("\n\n\n\n\n\n\n\n\n\n###################Debug Report###################")
     print("Number of species:", len(p.species))
     g = p.best_fitness[-1]
-    print(p.best_fitness)
-    print(p.avg_fitness)
     nn = Network(g)
     out =nn.activate([1, 0])
     print("OutPut:",out)
@@ -590,4 +675,5 @@ if __name__ == "__main__":
         if c.enable:
             d.edge(str(c.links[0]), str(c.links[1]), label=f"{c.weight:.2f}")
 
-    d.render("genome_graph", view=True, format="png")  # Saves and opens the file
+    d.render("genome_graph", view=True, format="png") 
+    test(g)
