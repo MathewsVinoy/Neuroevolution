@@ -1,5 +1,6 @@
 import math
 
+
 def sigmoid_activation(z):
     z = max(-60.0, min(60.0, 5.0 * z))
     return 1.0 / (1.0 + math.exp(-z))
@@ -17,7 +18,7 @@ def sin_activation(z):
 
 def gauss_activation(z):
     z = max(-3.4, min(3.4, z))
-    return math.exp(-5.0 * z ** 2)
+    return math.exp(-5.0 * z**2)
 
 
 def relu_activation(z):
@@ -52,7 +53,6 @@ def clamped_activation(z):
     return max(-1.0, min(1.0, z))
 
 
-
 def log_activation(z):
     z = max(1e-7, z)
     return math.log(z)
@@ -72,8 +72,8 @@ def hat_activation(z):
 
 
 def square_activation(z):
-    return z ** 2
+    return z**2
 
 
 def cube_activation(z):
-    return z ** 3
+    return z**3
