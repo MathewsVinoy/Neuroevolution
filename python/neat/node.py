@@ -1,4 +1,4 @@
-from neat.activation import sigmoid_activation
+from neat.activation import exp_activation
 from random import random, gauss
 from neat.config import Config
 
@@ -7,7 +7,7 @@ class Node:
         assert ntype in ('INPUT', 'OUTPUT', 'HIDDEN'), "Invalid node type."
         self.id = idno
         self.type = ntype
-        self.actfun = sigmoid_activation
+        self.actfun = exp_activation
         self.bias = 0.0
         self.output = 0.0
         self.response = 4.924273  # default NEAT response gain
