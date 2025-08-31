@@ -674,6 +674,7 @@ if __name__ == "__main__":
         print(c.inno_no) 
         if c.enable:
             d.edge(str(c.links[0]), str(c.links[1]), label=f"{c.weight:.2f}")
-
+    
+    print("Conpleated Sucessfully")
     d.render("genome_graph", view=True, format="png") 
     test(g)
